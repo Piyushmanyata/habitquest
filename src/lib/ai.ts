@@ -232,45 +232,124 @@ export async function analyzeEntry(text: string, opts?: { apiKey?: string; model
   return heuristicAnalyze(text);
 }
 
+export type BossReport = {
+  headline: string;        // one-sentence shape of the day
+  trend: string;           // how today compares to recent past
+  biggestWin: string;      // named, specific
+  biggestSlip: string;     // named, specific, no lecturing
+  patternCallout: string;  // a behavioural pattern Sage noticed
+  tomorrowMove: string;    // ONE concrete actionable move
+};
+
 export async function generateDailyRecap(
+  entries: { title: string; sentiment: Sentiment; xpDelta: number; parentId?: string; intensity?: number }[],
+  opts?: { apiKey?: string; comparisons?: string; memoryContext?: string }
+): Promise<BossReport> {
+  const pos = entries.filter(e => e.sentiment === 'positive').length;
+  const neg = entries.filter(e => e.sentiment === 'negative').length;
+  const net = entries.reduce((a, e) => a + e.xpDelta, 0);
+
+  const fallback = (): BossReport => ({
+    headline: entries.length === 0
+      ? 'A quiet day. Nothing logged.'
+      : `${pos} wins, ${neg} slips, net ${net >= 0 ? '+' : ''}${net} XP.`,
+    trend: 'No historical comparison available.',
+    biggestWin: entries.find(e => e.sentiment === 'positive')?.title || '—',
+    biggestSlip: entries.find(e => e.sentiment === 'negative')?.title || 'None today.',
+    patternCallout: 'Log a few more days to spot trends.',
+    tomorrowMove: net >= 0 ? 'Keep the streak alive — one positive before noon.' : 'Lead with one strong win first thing.',
+  });
+
+  const apiKey = getKey(opts);
+  if (!apiKey || entries.length === 0) return fallback();
+
+  const list = entries.map(e =>
+    `- "${e.title}" (${e.sentiment}, ${e.xpDelta >= 0 ? '+' : ''}${e.xpDelta} XP${e.parentId ? `, ${e.parentId}` : ''}${e.intensity ? `, i=${e.intensity}` : ''})`
+  ).join('\n');
+
+  const system = `You are SAGE, HabitQuest's end-of-day narrator: cheeky, brutally honest, never cruel. Same voice as the in-app quips.
+Write a DEEP "Boss Report" that compares today to the user's recent past.
+
+You receive: TODAY's entries, COMPARISON STATS (yesterday/7d/30d averages, shifts), and the user's PROFILE (recurring patterns).
+
+OUTPUT — strict JSON, EXACT shape, no markdown, no preamble:
+{
+  "headline":         "1 sentence — the shape of today (≤14 words)",
+  "trend":            "1 sentence — today vs recent past, cite specific numbers from the stats (≤22 words)",
+  "biggestWin":       "1 sentence — name the standout win specifically (≤18 words)",
+  "biggestSlip":      "1 sentence — name the standout slip; show you saw it, no lecturing (≤18 words). If no slips: praise the clean day briefly.",
+  "patternCallout":   "1 sentence — a BEHAVIOURAL PATTERN you noticed across today + recent days (≤22 words). Examples: 'You're shifting workouts earlier — peak hour moved from 18:00 to 8:00.' / 'Three weeks of meditation, never two days in a row.' / 'Slips cluster after 21:00.'",
+  "tomorrowMove":     "1 sentence — ONE concrete, specific action for tomorrow tied to the pattern above (≤16 words)"
+}
+
+RULES:
+- Cite SPECIFIC numbers from the comparison stats in "trend" (e.g., "+12 XP vs yesterday", "double your 7-day average").
+- "patternCallout" must reference data, not generalities.
+- No emojis. No bullet lists. No quotes around field values in your output.
+- Speak directly to the user ("you", "your") — never third person.
+
+EXAMPLE INPUT:
+TODAY entries: 4 positives (gym, reading, meditation, called family), 1 slip (1h tiktok)
+COMPARISON: net +84 today vs +30 yesterday; yesterday had 2 wins / 1 slip; 7-day avg net = +28/day; biggest cat shift: health ↑ 1.4/day
+PROFILE: usually meditates (5×) and reads (4×); recurring slip: screen.
+
+EXAMPLE OUTPUT:
+{"headline":"Stacked day. Four wins, one slip, comfortably positive.","trend":"+84 XP today vs +30 yesterday — nearly triple your 7-day average.","biggestWin":"The gym session anchored everything; intensity-4 effort early sets the day.","biggestSlip":"The 1h TikTok block — same trap, same hour as usual.","patternCallout":"Wins arrive in the morning, slips after 9pm. The day breaks where attention does.","tomorrowMove":"Park the phone at 8:30pm and start the wind-down a beat earlier."}`;
+
+  const userBody = [
+    `=== TODAY'S ENTRIES ===\n${list}`,
+    opts?.comparisons ? `\n=== COMPARISON STATS ===\n${opts.comparisons}` : '',
+    opts?.memoryContext ? `\n=== USER PROFILE ===\n${opts.memoryContext}` : '',
+  ].join('\n');
+
+  const prov = pickProvider(apiKey);
+  const tryOrder = prov.providerName === 'openrouter'
+    ? [prov.model, ...FREE_MODELS.map(m => m.id).filter(id => id !== prov.model)]
+    : [prov.model];
+
+  for (const model of tryOrder) {
+    try {
+      const res = await fetch(prov.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}`, ...prov.extraHeaders },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: userBody },
+          ],
+          temperature: 0.7,
+          max_tokens: 520,
+          response_format: { type: 'json_object' },
+        }),
+      });
+      if (!res.ok) { if (res.status === 429 || res.status === 404) continue; throw new Error(`AI ${res.status}`); }
+      const data = await res.json();
+      const parsed = extractJson(data?.choices?.[0]?.message?.content || '');
+      if (parsed && typeof parsed.headline === 'string') {
+        return {
+          headline:       String(parsed.headline).slice(0, 220),
+          trend:          String(parsed.trend || '').slice(0, 220),
+          biggestWin:     String(parsed.biggestWin || parsed.biggest_win || '—').slice(0, 220),
+          biggestSlip:    String(parsed.biggestSlip || parsed.biggest_slip || 'None today.').slice(0, 220),
+          patternCallout: String(parsed.patternCallout || parsed.pattern_callout || '').slice(0, 240),
+          tomorrowMove:   String(parsed.tomorrowMove || parsed.tomorrow_move || '').slice(0, 220),
+        };
+      }
+    } catch (err) {
+      console.warn('[ai] recap try failed:', model, err);
+      continue;
+    }
+  }
+  return fallback();
+}
+
+// Kept for any callers that still expect plain text — legacy stub.
+export async function generateDailyRecapText(
   entries: { title: string; sentiment: Sentiment; xpDelta: number }[],
   opts?: { apiKey?: string }
 ): Promise<string> {
-  const apiKey = getKey(opts);
-  if (!apiKey || entries.length === 0) {
-    const pos = entries.filter(e => e.sentiment === 'positive').length;
-    const neg = entries.filter(e => e.sentiment === 'negative').length;
-    const net = entries.reduce((a, e) => a + e.xpDelta, 0);
-    return `Today: ${pos} wins, ${neg} setbacks, net ${net >= 0 ? '+' : ''}${net} XP. ${net >= 0 ? 'Forward motion.' : 'Tomorrow is a comeback.'}`;
-  }
-  const list = entries.map(e => `- ${e.title} (${e.sentiment}, ${e.xpDelta} XP)`).join('\n');
-  const prov = pickProvider(apiKey);
-  try {
-    const res = await fetch(prov.url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}`, ...prov.extraHeaders },
-      body: JSON.stringify({
-        model: prov.model,
-        messages: [
-          { role: 'system', content: `You are SAGE, HabitQuest's end-of-day narrator: cheeky, brutally honest, never cruel. Same voice as the in-app quips.
-Write exactly 4 short sentences as a "Boss Report":
-  1. The shape of the day in one beat (e.g. "Mostly forward motion, one stumble.").
-  2. Biggest win — name it, no fluff.
-  3. Biggest slip — name it without lecturing; show you saw it.
-  4. ONE concrete move for tomorrow (be specific, actionable, ~10 words).
-No emojis, no markdown, no preamble like "Here is...". Just the four sentences.` },
-          { role: 'user', content: `Today's entries:\n${list}` },
-        ],
-        temperature: 0.8,
-        max_tokens: 220,
-      }),
-    });
-    if (!res.ok) throw new Error(`AI ${res.status}`);
-    const data = await res.json();
-    return String(data?.choices?.[0]?.message?.content || '').trim() || 'No report.';
-  } catch {
-    const pos = entries.filter(e => e.sentiment === 'positive').length;
-    const neg = entries.filter(e => e.sentiment === 'negative').length;
-    return `${pos} wins, ${neg} slips today. Keep moving.`;
-  }
+  const r = await generateDailyRecap(entries, opts);
+  return `${r.headline}\n${r.trend}\n${r.biggestWin}\n${r.biggestSlip}\n${r.patternCallout}\n${r.tomorrowMove}`;
 }
+

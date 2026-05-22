@@ -23,10 +23,11 @@ import WisdomPanel from './components/WisdomPanel';
 import AchievementReveal from './components/AchievementReveal';
 import TrophyChip from './components/TrophyChip';
 import ComboCallout from './components/ComboCallout';
+import Logs from './components/Logs';
 import { useHabitStore } from './store/useHabitStore';
 import { warmupLocalAI } from './lib/localAI';
 
-type Tab = 'journal' | 'analytics' | 'shop';
+type Tab = 'journal' | 'logs' | 'analytics' | 'shop';
 
 export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -46,8 +47,9 @@ export default function App() {
       if (e.key === 'Escape') { setSettingsOpen(false); setRecapOpen(false); return; }
       if (!e.metaKey && !e.ctrlKey && !e.altKey) {
         if (e.key === '1') setTab('journal');
-        if (e.key === '2') setTab('analytics');
-        if (e.key === '3') setTab('shop');
+        if (e.key === '2') setTab('logs');
+        if (e.key === '3') setTab('analytics');
+        if (e.key === '4') setTab('shop');
         if (e.key === 'r' || e.key === 'R') setRecapOpen(true);
         if (e.key === ',' ) setSettingsOpen(true);
       }
@@ -61,9 +63,10 @@ export default function App() {
       <TopBar onOpenSettings={() => setSettingsOpen(true)} onOpenRecap={() => setRecapOpen(true)} />
 
       <div className="flex items-center gap-1 mb-5 flex-wrap">
-        <TabBtn name="journal"   active={tab === 'journal'}   onClick={() => setTab('journal')} kbd="1" />
-        <TabBtn name="analytics" active={tab === 'analytics'} onClick={() => setTab('analytics')} kbd="2" />
-        <TabBtn name="shop"      active={tab === 'shop'}      onClick={() => setTab('shop')} kbd="3" />
+        <TabBtn name="journal"   active={tab === 'journal'}   onClick={() => setTab('journal')}   kbd="1" />
+        <TabBtn name="logs"      active={tab === 'logs'}      onClick={() => setTab('logs')}      kbd="2" />
+        <TabBtn name="analytics" active={tab === 'analytics'} onClick={() => setTab('analytics')} kbd="3" />
+        <TabBtn name="shop"      active={tab === 'shop'}      onClick={() => setTab('shop')}      kbd="4" />
         <TrophyChip />
         <div className="ml-auto"><AiStatus /></div>
       </div>
@@ -88,6 +91,7 @@ export default function App() {
           </aside>
         </div>
       )}
+      {tab === 'logs'      && <Logs />}
       {tab === 'analytics' && <Analytics />}
       {tab === 'shop'      && <Shop />}
 
