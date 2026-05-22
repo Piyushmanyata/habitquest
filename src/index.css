@@ -1,0 +1,123 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  /* Surface tokens */
+  --bg:       #07080a;
+  --bg-2:     #0c0d10;
+  --panel:    #111317;
+  --panel-2:  #161920;
+  --line:     #1f222a;
+  --line-2:   #2a2e38;
+
+  /* Text */
+  --fg:       #ededef;
+  --muted:    #8b8b94;
+  --muted-2:  #5c5c66;
+
+  /* Accents */
+  --accent:   #c2f54a;     /* lime — primary */
+  --accent-2: #7dd3fc;     /* sky-300 — secondary, used for info / hover halos */
+  --pos:      #c2f54a;
+  --neg:      #ff6b6b;
+  --warm:     #fbbf24;     /* amber for trophy / wager */
+}
+
+html, body, #root { height: 100%; }
+
+body {
+  font-family: 'Geist', 'Inter', system-ui, -apple-system, sans-serif;
+  background:
+    radial-gradient(1200px 600px at 0% -10%, rgba(125, 211, 252, 0.04), transparent 60%),
+    radial-gradient(1200px 600px at 100% 110%, rgba(194, 245, 74, 0.05), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.01em;
+  font-feature-settings: 'ss01', 'cv11';
+}
+
+.font-display { font-family: 'Geist', 'Inter', system-ui, sans-serif; letter-spacing: -0.025em; }
+.mono { font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* ──────── Surfaces ──────── */
+
+.surface {
+  background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  transition: border-color 0.18s ease, transform 0.18s ease;
+}
+
+.surface-soft {
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.hairline   { border-color: var(--line); }
+.hairline-2 { border-color: var(--line-2); }
+
+/* ──────── Buttons ──────── */
+
+.btn {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  padding: 0.55rem 0.9rem; border-radius: 10px;
+  font-size: 0.875rem; font-weight: 500;
+  border: 1px solid var(--line-2); color: var(--fg);
+  background: transparent;
+  transition: all 0.15s ease;
+}
+.btn:hover { background: rgba(255,255,255,0.04); border-color: #3a3a42; }
+
+.btn-primary {
+  background: var(--accent); color: #0a0a0b; border-color: var(--accent);
+  font-weight: 600;
+  box-shadow: 0 0 0 0 rgba(194,245,74,0);
+}
+.btn-primary:hover {
+  background: #d6ff66; border-color: #d6ff66;
+  box-shadow: 0 0 24px -6px rgba(194,245,74,0.35);
+}
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+
+/* ──────── Chips ──────── */
+
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 500;
+  border: 1px solid var(--line-2); color: var(--muted);
+  background: rgba(255,255,255,0.02);
+}
+.chip-pos { color: var(--pos); border-color: rgba(194,245,74,0.30); background: rgba(194,245,74,0.06); }
+.chip-neg { color: var(--neg); border-color: rgba(255,107,107,0.30); background: rgba(255,107,107,0.06); }
+.chip-warm{ color: var(--warm); border-color: rgba(251,191,36,0.30); background: rgba(251,191,36,0.06); }
+.chip-info{ color: var(--accent-2); border-color: rgba(125,211,252,0.30); background: rgba(125,211,252,0.06); }
+
+/* ──────── Inputs ──────── */
+
+input, textarea, select {
+  background: transparent;
+  outline: none;
+  color: var(--fg);
+}
+input:focus, textarea:focus, select:focus {
+  outline: none;
+}
+
+/* ──────── Scrollbar ──────── */
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: #3a3a42; }
+::selection { background: var(--accent); color: #0a0a0b; }
+
+/* ──────── Utility: subtle hover lift ──────── */
+
+.lift:hover { transform: translateY(-1px); border-color: var(--line-2); }
