@@ -7,6 +7,7 @@ import { suggestQuestFromRecent } from '../lib/aiQuests';
 import { heuristicAnalyze } from '../lib/heuristic';
 import { speak as ttsSpeak } from '../lib/tts';
 import { mintCustomBadge, CustomBadge } from '../lib/aiBadges';
+import { sendChatMessage } from '../lib/aiChat';
 import {
   dayKey, generateDailyQuests, levelFromXp,
   Quest, BADGES,
@@ -73,8 +74,10 @@ type State = {
   wager: { day: string; amount: number; resolved: 'win' | 'lose' | null } | null;
   ttsEnabled: boolean;
   ttsVoice: string;
+  tone: 'savage' | 'balanced' | 'encouraging';
   customBadges: CustomBadge[];
   lastCustomBadge: { badge: CustomBadge; at: number } | null;
+  chatHistory: { role: 'user' | 'assistant'; content: string; at: number }[];
 
   setApiKey: (k: string) => void;
   addEntry: (text: string) => Promise<Entry>;
@@ -107,10 +110,13 @@ type State = {
   placeWager: (amount: number) => { ok: boolean; reason?: string };
   resolveWagerIfDue: () => void;
   setTts: (enabled: boolean, voice?: string) => void;
+  setTone: (tone: 'savage' | 'balanced' | 'encouraging') => void;
   addEntries: (text: string) => Promise<Entry[]>;
   completeAiQuest: (questId: string) => void;
   clearLastCustomBadge: () => void;
   removeCustomBadge: (id: string) => void;
+  sendChat: (msg: string) => Promise<void>;
+  clearChat: () => void;
 };
 
 const COMBO_WINDOW_MS = 25 * 60 * 1000; // 25 min idle resets combo
@@ -373,8 +379,10 @@ export const useHabitStore = create<State>()(
       wager: null,
       ttsEnabled: true,
       ttsVoice: '',
+      tone: 'balanced',
       customBadges: [],
       lastCustomBadge: null,
+      chatHistory: [],
 
       setApiKey(k) {
         const v = k.trim();
@@ -684,6 +692,28 @@ export const useHabitStore = create<State>()(
         set(s => ({ customBadges: s.customBadges.filter(b => b.id !== id) }));
       },
 
+      setTone(tone) { set({ tone }); },
+
+      clearChat() { set({ chatHistory: [] }); },
+
+      async sendChat(msg) {
+        const trimmed = msg.trim();
+        if (!trimmed) return;
+        const userMsg = { role: 'user' as const, content: trimmed, at: Date.now() };
+        set(s => ({ chatHistory: [...s.chatHistory, userMsg] }));
+
+        const s = get();
+        const memCtx = memoryAsPrompt(deriveMemory(s.entries));
+        const recent = s.entries.slice(0, 8).map(e =>
+          `- "${e.title}" [${e.sentiment}, ${e.parentId}, ${e.xpDelta >= 0 ? '+' : ''}${e.xpDelta}xp, ${new Date(e.createdAt).toLocaleString()}]`
+        ).join('\n');
+        const reply = await sendChatMessage(
+          s.chatHistory.map(m => ({ role: m.role, content: m.content })),
+          memCtx, recent, s.tone,
+        );
+        set(st => ({ chatHistory: [...st.chatHistory, { role: 'assistant', content: reply, at: Date.now() }] }));
+      },
+
       setTts(enabled, voice) {
         set({ ttsEnabled: enabled, ...(voice !== undefined ? { ttsVoice: voice } : {}) });
       },
@@ -856,7 +886,7 @@ export const useHabitStore = create<State>()(
       },
     }),
     {
-      name: 'habitquest-v9',
+      name: 'habitquest-v10',
       onRehydrateStorage: () => (s) => {
         if (s && !s.apiKey) {
           const fromLs =

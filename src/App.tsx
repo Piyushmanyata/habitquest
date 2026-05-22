@@ -24,6 +24,8 @@ import AchievementReveal from './components/AchievementReveal';
 import TrophyChip from './components/TrophyChip';
 import ComboCallout from './components/ComboCallout';
 import Logs from './components/Logs';
+import StreakCalendar from './components/StreakCalendar';
+import CoachChat from './components/CoachChat';
 import { useHabitStore } from './store/useHabitStore';
 import { warmupLocalAI } from './lib/localAI';
 
@@ -81,8 +83,10 @@ export default function App() {
             <Timeline />
           </main>
           <aside className="space-y-4">
+            <StreakCalendar />
             <Boss />
             <AiChallengeCard />
+            <CoachChat />
             <MemoryCard />
             <WisdomPanel />
             <Inventory />

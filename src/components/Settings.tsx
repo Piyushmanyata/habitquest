@@ -11,6 +11,8 @@ export default function Settings({ open, onClose }: { open: boolean; onClose: ()
   const ttsEnabled = useHabitStore(s => s.ttsEnabled);
   const ttsVoice = useHabitStore(s => s.ttsVoice);
   const setTts = useHabitStore(s => s.setTts);
+  const tone = useHabitStore(s => s.tone);
+  const setTone = useHabitStore(s => s.setTone);
   const [local, setLocal] = useState(apiKey);
   const [model, setModel] = useState(getSelectedModelId());
   const [saved, setSaved] = useState(false);
@@ -107,6 +109,29 @@ export default function Settings({ open, onClose }: { open: boolean; onClose: ()
                     {apiKey ? (isOpenRouter ? 'openrouter' : 'deepseek') : 'browser-ai'}
                   </span>
                 </span>
+              </div>
+
+              <div className="mt-6 pt-5 border-t hairline">
+                <label className="text-xs text-[var(--muted)]">Sage's Tone</label>
+                <div className="grid grid-cols-3 gap-1.5 mt-1.5">
+                  {(['savage', 'balanced', 'encouraging'] as const).map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setTone(t)}
+                      className={`px-2 py-1.5 rounded-md text-[11px] font-medium uppercase tracking-wider transition border
+                        ${tone === t
+                          ? 'bg-[var(--accent)] text-[#0a0a0b] border-[var(--accent)]'
+                          : 'border-[var(--line-2)] text-[var(--muted)] hover:text-[var(--fg)] hover:bg-white/[0.03]'}`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-[var(--muted-2)] mt-1.5">
+                  {tone === 'savage' && 'Brutally honest. Roasts the slips. Punch lines only.'}
+                  {tone === 'balanced' && 'Half coach, half cheeky dungeon master. Default.'}
+                  {tone === 'encouraging' && 'Warm and supportive. Finds the silver lining.'}
+                </p>
               </div>
 
               <div className="mt-6 pt-5 border-t hairline">
