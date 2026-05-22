@@ -63,7 +63,7 @@ export default function App() {
   }, []);
 
   return (
-    <div className="min-h-screen px-5 md:px-6 py-5 md:py-7 max-w-6xl mx-auto">
+    <div className="min-h-screen px-5 md:px-6 py-5 md:py-7 max-w-7xl mx-auto">
       <TopBar onOpenSettings={() => setSettingsOpen(true)} onOpenRecap={() => setRecapOpen(true)} />
 
       <div className="flex items-center gap-1 mb-5 flex-wrap">
@@ -79,20 +79,27 @@ export default function App() {
       <CheckinBanner />
 
       {tab === 'journal' && (
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
-          <main className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_300px_300px] gap-5">
+          {/* COLUMN 1 — main: journal + timeline + chat (chat sits under logs and grows with them) */}
+          <main className="space-y-4 md:col-span-2 xl:col-span-1 min-w-0">
             <PassBar />
             <JournalInput />
             <Timeline />
+            <CoachChat />
           </main>
-          <aside className="space-y-4">
+
+          {/* COLUMN 2 — "now": present-moment cards */}
+          <aside className="space-y-4 min-w-0">
             <StreakCalendar />
             <Boss />
             <AiChallengeCard />
-            <CoachChat />
+            <Inventory />
+          </aside>
+
+          {/* COLUMN 3 — "context": memory + patterns + goals */}
+          <aside className="space-y-4 min-w-0">
             <MemoryCard />
             <WisdomPanel />
-            <Inventory />
             <Quests />
             <Stats />
           </aside>
