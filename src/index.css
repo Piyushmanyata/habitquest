@@ -154,3 +154,60 @@ input:focus, textarea:focus, select:focus { outline: none; }
 .glow-coral { box-shadow: 0 0 32px -8px rgba(255,107,107,0.45); }
 .glow-purple{ box-shadow: 0 0 32px -8px rgba(168,85,247,0.45); }
 .glow-warm  { box-shadow: 0 0 32px -8px rgba(251,191,36,0.45); }
+
+/* ──────── Sectioned layout for the single-page Journal view ──────── */
+.section {
+  position: relative;
+  border-radius: 22px;
+  padding: 1.25rem 1.25rem 1.5rem;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 22px;
+  padding: 1px;
+  background: var(--section-accent, linear-gradient(180deg, rgba(255,255,255,0.06), transparent));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+}
+.section-bg {
+  position: absolute;
+  inset: 0;
+  border-radius: 22px;
+  pointer-events: none;
+  opacity: 0.45;
+}
+
+.section-hero    { --section-accent: linear-gradient(135deg, rgba(168,85,247,0.65), rgba(125,211,252,0.45) 50%, rgba(194,245,74,0.55)); }
+.section-journal { --section-accent: linear-gradient(135deg, rgba(194,245,74,0.55), rgba(255,255,255,0.05)); }
+.section-battle  { --section-accent: linear-gradient(135deg, rgba(255,107,107,0.55), rgba(251,191,36,0.55)); }
+.section-insight { --section-accent: linear-gradient(135deg, rgba(125,211,252,0.55), rgba(168,85,247,0.4)); }
+.section-armory  { --section-accent: linear-gradient(135deg, rgba(168,85,247,0.6), rgba(251,191,36,0.4)); }
+.section-chat    { --section-accent: linear-gradient(135deg, rgba(125,211,252,0.55), rgba(194,245,74,0.5) 60%, rgba(168,85,247,0.55)); }
+
+.section-hero    > .section-bg { background: radial-gradient(800px 280px at 0% 0%, rgba(168,85,247,0.10), transparent 60%), radial-gradient(800px 280px at 100% 100%, rgba(125,211,252,0.08), transparent 60%); }
+.section-journal > .section-bg { background: radial-gradient(800px 280px at 100% 0%, rgba(194,245,74,0.08), transparent 60%); }
+.section-battle  > .section-bg { background: radial-gradient(800px 280px at 0% 100%, rgba(255,107,107,0.10), transparent 60%), radial-gradient(800px 280px at 100% 0%, rgba(251,191,36,0.07), transparent 60%); }
+.section-insight > .section-bg { background: radial-gradient(800px 280px at 0% 0%, rgba(125,211,252,0.10), transparent 60%); }
+.section-armory  > .section-bg { background: radial-gradient(800px 280px at 100% 50%, rgba(168,85,247,0.12), transparent 60%), radial-gradient(800px 280px at 0% 100%, rgba(251,191,36,0.06), transparent 60%); }
+.section-chat    > .section-bg { background: radial-gradient(900px 320px at 50% 0%, rgba(125,211,252,0.10), transparent 60%), radial-gradient(900px 320px at 50% 100%, rgba(194,245,74,0.10), transparent 60%); }
+
+/* Section header — small uppercase eyebrow + big title + sublabel */
+.section-eyebrow {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.section-title {
+  font-family: 'Geist', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+}

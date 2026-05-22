@@ -8,6 +8,7 @@ import { heuristicAnalyze } from '../lib/heuristic';
 import { speak as ttsSpeak } from '../lib/tts';
 import { mintCustomBadge, CustomBadge } from '../lib/aiBadges';
 import { sendChatMessage } from '../lib/aiChat';
+import { GEAR_BY_ID, aggregateBonuses, GearSlot, AggregateBonuses } from '../lib/gear';
 import {
   dayKey, generateDailyQuests, levelFromXp,
   Quest, BADGES,
@@ -82,6 +83,9 @@ type State = {
   customBadges: CustomBadge[];
   lastCustomBadge: { badge: CustomBadge; at: number } | null;
   chatHistory: { role: 'user' | 'assistant'; content: string; at: number }[];
+  gearOwned: string[];
+  gearEquipped: Partial<Record<GearSlot, string>>;
+  lastGear: { id: string; action: 'bought' | 'equipped'; at: number } | null;
 
   setApiKey: (k: string) => void;
   addEntry: (text: string) => Promise<Entry>;
@@ -121,6 +125,10 @@ type State = {
   removeCustomBadge: (id: string) => void;
   sendChat: (msg: string) => Promise<void>;
   clearChat: () => void;
+  buyGear: (id: string) => { ok: boolean; reason?: string };
+  equipGear: (id: string) => void;
+  unequipGear: (slot: GearSlot) => void;
+  gearBonuses: () => AggregateBonuses;
 };
 
 const COMBO_WINDOW_MS = 25 * 60 * 1000; // 25 min idle resets combo
@@ -242,6 +250,15 @@ function applyOneEntry(quick: EntryAnalysis, batchId: string, get: any, set: any
   if (useFocus) mult *= 2;
   if (useCrit)  mult *= 3;
   if (quick.sentiment === 'positive' && sNow.trophy && Date.now() < sNow.trophy.expiresAt) mult *= 1.1;
+
+  // Gear bonuses (apply only to positive entries)
+  const gear = aggregateBonuses(sNow.gearEquipped);
+  if (quick.sentiment === 'positive') {
+    mult *= gear.xpMultiplier;
+    const catBonus = gear.categoryBoost[quick.parentId];
+    if (catBonus) mult *= (1 + catBonus);
+  }
+
   let xpDelta = Math.round(baseDelta * mult);
 
   // Bonuses for richer journaling
@@ -274,7 +291,7 @@ function applyOneEntry(quick: EntryAnalysis, batchId: string, get: any, set: any
     if (Date.now() >= comboExpiresAt) combo = 0;
     if (entry.sentiment === 'positive') {
       combo += 1;
-      comboExpiresAt = Date.now() + COMBO_WINDOW_MS;
+      comboExpiresAt = Date.now() + COMBO_WINDOW_MS + gear.comboExtendSec * 1000;
       comboBest = Math.max(comboBest, combo);
     } else if (entry.sentiment === 'negative') {
       combo = 0; comboExpiresAt = 0;
@@ -289,7 +306,7 @@ function applyOneEntry(quick: EntryAnalysis, batchId: string, get: any, set: any
     let trophy = s.trophy;
     let bossesDefeated = s.profile.bossesDefeated;
     if (entry.sentiment === 'positive') {
-      const dmg = damageFor(entry.intensity, mult);
+      const dmg = Math.round(damageFor(entry.intensity, mult) * gear.bossDamageMultiplier);
       boss = { ...boss, hpLeft: Math.max(0, boss.hpLeft - dmg) };
       if (boss.hpLeft <= 0 && !boss.defeated) {
         boss = { ...boss, defeated: true, defeatedAt: Date.now() };
@@ -401,6 +418,10 @@ export const useHabitStore = create<State>()(
       customBadges: [],
       lastCustomBadge: null,
       chatHistory: [],
+      // Starter gear: free body + legs equipped from the start so the doll isn't empty.
+      gearOwned: ['b-linen', 'l-linen'],
+      gearEquipped: { body: 'b-linen', legs: 'l-linen' },
+      lastGear: null,
 
       setApiKey(k) {
         const v = k.trim();
@@ -714,6 +735,49 @@ export const useHabitStore = create<State>()(
 
       clearChat() { set({ chatHistory: [] }); },
 
+      buyGear(id) {
+        const s = get();
+        const item = GEAR_BY_ID[id];
+        if (!item) return { ok: false, reason: 'unknown' };
+        if (s.gearOwned.includes(id)) return { ok: false, reason: 'already owned' };
+        const lvl = levelFromXp(s.profile.xp).level;
+        if (item.unlockLevel && lvl < item.unlockLevel) {
+          return { ok: false, reason: `Requires level ${item.unlockLevel}` };
+        }
+        if (s.profile.xp < item.cost) {
+          return { ok: false, reason: `Need ${item.cost - s.profile.xp} more XP` };
+        }
+        set({
+          profile: { ...s.profile, xp: s.profile.xp - item.cost },
+          gearOwned: [...s.gearOwned, id],
+          // auto-equip if slot is empty
+          gearEquipped: s.gearEquipped[item.slot] ? s.gearEquipped : { ...s.gearEquipped, [item.slot]: id },
+          lastGear: { id, action: 'bought', at: Date.now() },
+        });
+        return { ok: true };
+      },
+
+      equipGear(id) {
+        const s = get();
+        const item = GEAR_BY_ID[id];
+        if (!item || !s.gearOwned.includes(id)) return;
+        set({
+          gearEquipped: { ...s.gearEquipped, [item.slot]: id },
+          lastGear: { id, action: 'equipped', at: Date.now() },
+        });
+      },
+
+      unequipGear(slot) {
+        const s = get();
+        const next = { ...s.gearEquipped };
+        delete next[slot];
+        set({ gearEquipped: next });
+      },
+
+      gearBonuses() {
+        return aggregateBonuses(get().gearEquipped);
+      },
+
       async sendChat(msg) {
         const trimmed = msg.trim();
         if (!trimmed) return;
@@ -904,7 +968,7 @@ export const useHabitStore = create<State>()(
       },
     }),
     {
-      name: 'habitquest-v10',
+      name: 'habitquest-v11',
       onRehydrateStorage: () => (s) => {
         if (s && !s.apiKey) {
           const fromLs =

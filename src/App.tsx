@@ -27,15 +27,27 @@ import Logs from './components/Logs';
 import StreakCalendar from './components/StreakCalendar';
 import CoachChat from './components/CoachChat';
 import MoodPanel from './components/MoodPanel';
+import Character from './components/Character';
+import Armory from './components/Armory';
+import Section from './components/Section';
 import { useHabitStore } from './store/useHabitStore';
 import { warmupLocalAI } from './lib/localAI';
 
-type Tab = 'journal' | 'logs' | 'analytics' | 'mood' | 'shop';
+type Tab = 'home' | 'logs' | 'analytics' | 'mood' | 'shop';
+
+const ANCHORS: Record<string, string> = {
+  hero: 'hero',
+  journal: 'journal',
+  battle: 'battle',
+  insight: 'insight',
+  armory: 'armory',
+  chat: 'chat',
+};
 
 export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [recapOpen, setRecapOpen] = useState(false);
-  const [tab, setTab] = useState<Tab>('journal');
+  const [tab, setTab] = useState<Tab>('home');
   const refresh = useHabitStore(s => s.refreshQuests);
 
   useEffect(() => { refresh(); }, [refresh]);
@@ -44,12 +56,11 @@ export default function App() {
   // Keyboard shortcuts
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      // ignore typing in inputs
       const target = e.target as HTMLElement;
       if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
       if (e.key === 'Escape') { setSettingsOpen(false); setRecapOpen(false); return; }
       if (!e.metaKey && !e.ctrlKey && !e.altKey) {
-        if (e.key === '1') setTab('journal');
+        if (e.key === '1') setTab('home');
         if (e.key === '2') setTab('logs');
         if (e.key === '3') setTab('analytics');
         if (e.key === '4') setTab('mood');
@@ -62,12 +73,17 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  function scrollToAnchor(name: string) {
+    const el = document.getElementById(ANCHORS[name]);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   return (
     <div className="min-h-screen px-5 md:px-6 py-5 md:py-7 max-w-7xl mx-auto">
       <TopBar onOpenSettings={() => setSettingsOpen(true)} onOpenRecap={() => setRecapOpen(true)} />
 
       <div className="flex items-center gap-1 mb-5 flex-wrap">
-        <TabBtn name="journal"   active={tab === 'journal'}   onClick={() => setTab('journal')}   kbd="1" />
+        <TabBtn name="home"      active={tab === 'home'}      onClick={() => setTab('home')}      kbd="1" />
         <TabBtn name="logs"      active={tab === 'logs'}      onClick={() => setTab('logs')}      kbd="2" />
         <TabBtn name="analytics" active={tab === 'analytics'} onClick={() => setTab('analytics')} kbd="3" />
         <TabBtn name="mood"      active={tab === 'mood'}      onClick={() => setTab('mood')}      kbd="4" />
@@ -78,33 +94,90 @@ export default function App() {
 
       <CheckinBanner />
 
-      {tab === 'journal' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_300px_300px] gap-5">
-          {/* COLUMN 1 — main: journal + timeline + chat (chat sits under logs and grows with them) */}
-          <main className="space-y-4 md:col-span-2 xl:col-span-1 min-w-0">
-            <PassBar />
-            <JournalInput />
-            <Timeline />
+      {tab === 'home' && (
+        <div className="space-y-6">
+          {/* Quick-jump nav inside home page */}
+          <div className="flex flex-wrap gap-1.5 text-[11px] mono uppercase tracking-wider">
+            <JumpChip onClick={() => scrollToAnchor('hero')}    label="hero"    accent="purple" />
+            <JumpChip onClick={() => scrollToAnchor('journal')} label="journal" accent="lime" />
+            <JumpChip onClick={() => scrollToAnchor('battle')}  label="battle"  accent="warm" />
+            <JumpChip onClick={() => scrollToAnchor('insight')} label="insight" accent="info" />
+            <JumpChip onClick={() => scrollToAnchor('armory')}  label="armory"  accent="purple" />
+            <JumpChip onClick={() => scrollToAnchor('chat')}    label="sage"    accent="info" />
+          </div>
+
+          {/* ═══ HERO ═══ */}
+          <Section
+            id="hero" theme="hero"
+            eyebrow="01 · your hero" title="Character & Streak"
+            subtitle="Equip gear, watch your streak burn, and aim at today's boss."
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Character />
+              <StreakCalendar />
+              <Boss />
+            </div>
+          </Section>
+
+          {/* ═══ JOURNAL ═══ */}
+          <Section
+            id="journal" theme="journal"
+            eyebrow="02 · log the day" title="Journal"
+            subtitle="Write what you did, how you felt, what you thought. Sage scores it."
+          >
+            <div className="space-y-4">
+              <PassBar />
+              <JournalInput />
+              <Timeline />
+            </div>
+          </Section>
+
+          {/* ═══ BATTLE ═══ */}
+          <Section
+            id="battle" theme="battle"
+            eyebrow="03 · today's fight" title="Challenge, Quests & Inventory"
+            subtitle="Daily challenge from Sage, rolling quests, consumables you've earned or bought."
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <AiChallengeCard />
+              <Quests />
+              <Inventory />
+            </div>
+          </Section>
+
+          {/* ═══ INSIGHT ═══ */}
+          <Section
+            id="insight" theme="insight"
+            eyebrow="04 · what sage sees" title="Memory, Wisdom & Stats"
+            subtitle="The patterns Sage has learned about you and the achievements you've banked."
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <MemoryCard />
+              <WisdomPanel />
+              <Stats />
+            </div>
+          </Section>
+
+          {/* ═══ ARMORY ═══ */}
+          <Section
+            id="armory" theme="armory"
+            eyebrow="05 · gear up" title="The Armory"
+            subtitle="Trade XP for permanent gear. Bonuses stack and apply to every positive entry."
+          >
+            <Armory />
+          </Section>
+
+          {/* ═══ CHAT WITH SAGE — full width, prominent ═══ */}
+          <Section
+            id="chat" theme="chat"
+            eyebrow="06 · talk to sage" title="Coach Conversation"
+            subtitle="Ask anything. Sage remembers your patterns and replies in your chosen tone."
+          >
             <CoachChat />
-          </main>
-
-          {/* COLUMN 2 — "now": present-moment cards */}
-          <aside className="space-y-4 min-w-0">
-            <StreakCalendar />
-            <Boss />
-            <AiChallengeCard />
-            <Inventory />
-          </aside>
-
-          {/* COLUMN 3 — "context": memory + patterns + goals */}
-          <aside className="space-y-4 min-w-0">
-            <MemoryCard />
-            <WisdomPanel />
-            <Quests />
-            <Stats />
-          </aside>
+          </Section>
         </div>
       )}
+
       {tab === 'logs'      && <Logs />}
       {tab === 'analytics' && <Analytics />}
       {tab === 'mood'      && <MoodPanel />}
@@ -132,6 +205,21 @@ function TabBtn({ name, active, onClick, kbd }: { name: string; active: boolean;
     >
       {name}
       {kbd && <span className={`mono text-[9px] px-1 py-0.5 rounded border ${active ? 'border-[#0a0a0b]/40 text-[#0a0a0b]/70' : 'border-[var(--line-2)] text-[var(--muted-2)]'}`}>{kbd}</span>}
+    </button>
+  );
+}
+
+function JumpChip({ label, accent, onClick }: { label: string; accent: 'lime' | 'warm' | 'info' | 'purple'; onClick: () => void }) {
+  const cls = accent === 'lime'   ? 'text-[var(--accent)] border-[rgba(194,245,74,0.4)]'
+            : accent === 'warm'   ? 'text-amber-300 border-amber-300/40'
+            : accent === 'info'   ? 'text-sky-300 border-sky-300/40'
+            : 'text-purple-300 border-purple-300/40';
+  return (
+    <button
+      onClick={onClick}
+      className={`px-2.5 py-1 rounded-full border bg-transparent hover:bg-white/[0.03] transition ${cls}`}
+    >
+      ↓ {label}
     </button>
   );
 }
