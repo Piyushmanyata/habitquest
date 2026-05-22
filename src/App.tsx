@@ -31,7 +31,6 @@ import Character from './components/Character';
 import Armory from './components/Armory';
 import Section from './components/Section';
 import { useHabitStore } from './store/useHabitStore';
-import { warmupLocalAI } from './lib/localAI';
 
 type Tab = 'home' | 'logs' | 'analytics' | 'mood' | 'shop';
 
@@ -51,7 +50,6 @@ export default function App() {
   const refresh = useHabitStore(s => s.refreshQuests);
 
   useEffect(() => { refresh(); }, [refresh]);
-  useEffect(() => { const t = setTimeout(() => warmupLocalAI(), 800); return () => clearTimeout(t); }, []);
 
   // Keyboard shortcuts
   useEffect(() => {

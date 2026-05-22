@@ -2,7 +2,7 @@
 // that fold into the live XP / combo / loot / boss-damage math.
 
 export type GearSlot = 'head' | 'body' | 'hands' | 'legs' | 'feet' | 'weapon' | 'trinket';
-export type GearRarity = 'common' | 'rare' | 'epic' | 'legendary';
+export type GearRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
 
 export type GearStats = {
   /** Percent multiplier on positive XP (e.g. 0.1 = +10%). */
@@ -38,6 +38,7 @@ export const RARITY_COLOR: Record<GearRarity, string> = {
   rare:      '#7dd3fc',
   epic:      '#a855f7',
   legendary: '#fbbf24',
+  mythic:    '#ff4d6d',
 };
 
 export const RARITY_GLOW: Record<GearRarity, string> = {
@@ -45,7 +46,10 @@ export const RARITY_GLOW: Record<GearRarity, string> = {
   rare:      '0 0 22px -6px rgba(125,211,252,0.45)',
   epic:      '0 0 26px -6px rgba(168,85,247,0.55)',
   legendary: '0 0 32px -6px rgba(251,191,36,0.65)',
+  mythic:    '0 0 40px -4px rgba(255,77,109,0.85), 0 0 80px -10px rgba(168,85,247,0.55)',
 };
+
+export const RARITY_ORDER: GearRarity[] = ['common', 'rare', 'epic', 'legendary', 'mythic'];
 
 export const SLOT_LABEL: Record<GearSlot, string> = {
   head: 'Head', body: 'Body', hands: 'Hands', legs: 'Legs',
@@ -73,6 +77,14 @@ export const GEAR: GearItem[] = [
     description: '+8% XP and combo window holds 7 minutes longer.', stats: { xpBoost: 0.08, comboExtendMin: 7 } },
   { id: 'h-sage',     slot: 'head', name: "Sage's Circlet",   emoji: '✨', rarity: 'legendary', cost: 700, unlockLevel: 10,
     description: '+15% XP, +10 min combo. Legendary.', stats: { xpBoost: 0.15, comboExtendMin: 10 } },
+  { id: 'h-monkmask', slot: 'head', name: 'Monk Mask',        emoji: '🥷', rarity: 'rare', cost: 165, unlockLevel: 4,
+    description: '+8% XP on Mind & Wellbeing entries.', stats: { categoryBoost: { mind: 0.08 } } },
+  { id: 'h-warhelm',  slot: 'head', name: 'War Helm',         emoji: '🪖', rarity: 'epic', cost: 410, unlockLevel: 9,
+    description: '+25% boss damage. Heavy hangs the head.', stats: { bossDamage: 0.25 } },
+  { id: 'h-prophet',  slot: 'head', name: 'Prophet Hood',     emoji: '🔮', rarity: 'legendary', cost: 820, unlockLevel: 13,
+    description: '+12% XP on Learning & Mastery and +5 min combo.', stats: { categoryBoost: { mastery: 0.12 }, comboExtendMin: 5 } },
+  { id: 'h-mindcrown',slot: 'head', name: 'Mindforge Crown',  emoji: '🧠', rarity: 'mythic', cost: 1600, unlockLevel: 22,
+    description: '+22% XP and +15 min combo. The mind that built itself.', stats: { xpBoost: 0.22, comboExtendMin: 15 } },
 
   // ─── BODY ───
   { id: 'b-linen',    slot: 'body', name: 'Linen Tunic',      emoji: '👕', rarity: 'common', cost: 0,
@@ -87,6 +99,16 @@ export const GEAR: GearItem[] = [
     description: '+10% XP and +20% boss damage.', stats: { xpBoost: 0.10, bossDamage: 0.20 } },
   { id: 'b-forge',    slot: 'body', name: 'Habit-Forged Cuirass', emoji: '🪖', rarity: 'legendary', cost: 780, unlockLevel: 12,
     description: '+18% XP. The armor of someone who shows up.', stats: { xpBoost: 0.18 } },
+  { id: 'b-runner',   slot: 'body', name: 'Athlete Singlet',  emoji: '🏃', rarity: 'rare', cost: 150, unlockLevel: 3,
+    description: '+12% XP on Health & Body workouts.', stats: { categoryBoost: { health: 0.12 } } },
+  { id: 'b-monk',     slot: 'body', name: 'Monk Cassock',     emoji: '🧘', rarity: 'epic', cost: 360, unlockLevel: 8,
+    description: '+15% XP on Mind & Wellbeing, calm energy.', stats: { categoryBoost: { mind: 0.15 } } },
+  { id: 'b-creator',  slot: 'body', name: 'Maker Apron',      emoji: '🧑‍🎨', rarity: 'rare', cost: 200, unlockLevel: 5,
+    description: '+12% XP on Creative & Hobby projects.', stats: { categoryBoost: { creative: 0.12 } } },
+  { id: 'b-ascended', slot: 'body', name: 'Ascended Robes',   emoji: '🌌', rarity: 'mythic', cost: 1850, unlockLevel: 24,
+    description: '+25% XP across all entries.', stats: { xpBoost: 0.25 } },
+  { id: 'b-titan',    slot: 'body', name: 'Titan Carapace',   emoji: '🛡️', rarity: 'mythic', cost: 2000, unlockLevel: 27,
+    description: '+40% boss damage and +12% XP.', stats: { bossDamage: 0.40, xpBoost: 0.12 } },
 
   // ─── HANDS ───
   { id: 'g-cloth',    slot: 'hands', name: 'Cloth Gloves',    emoji: '🧤', rarity: 'common', cost: 20,
@@ -97,6 +119,12 @@ export const GEAR: GearItem[] = [
     description: 'Combo window holds 6 min longer.', stats: { comboExtendMin: 6 } },
   { id: 'g-sage',     slot: 'hands', name: "Sage's Touch",    emoji: '✋', rarity: 'epic', cost: 340, unlockLevel: 7,
     description: '+12% loot drop rate.', stats: { lootBoost: 0.12 } },
+  { id: 'g-gold',     slot: 'hands', name: 'Goldfinger Gloves', emoji: '🤲', rarity: 'rare', cost: 175, unlockLevel: 5,
+    description: '+8% loot rate and +3% XP.', stats: { lootBoost: 0.08, xpBoost: 0.03 } },
+  { id: 'g-titan',    slot: 'hands', name: 'Titan Knuckles',   emoji: '👊', rarity: 'legendary', cost: 720, unlockLevel: 14,
+    description: '+30% boss damage. Punch through walls.', stats: { bossDamage: 0.30 } },
+  { id: 'g-godhand',  slot: 'hands', name: 'God-Hand of Habit',emoji: '🤚', rarity: 'mythic', cost: 1500, unlockLevel: 20,
+    description: '+18% loot, +10% XP, +8 min combo.', stats: { lootBoost: 0.18, xpBoost: 0.10, comboExtendMin: 8 } },
 
   // ─── LEGS ───
   { id: 'l-linen',    slot: 'legs', name: 'Linen Trousers',   emoji: '👖', rarity: 'common', cost: 0,
@@ -105,6 +133,14 @@ export const GEAR: GearItem[] = [
     description: '+10% XP on Health & Body.', stats: { categoryBoost: { health: 0.10 } } },
   { id: 'l-discipline', slot: 'legs', name: 'Discipline Pants', emoji: '🩳', rarity: 'epic', cost: 320, unlockLevel: 7,
     description: '+8% XP on every entry.', stats: { xpBoost: 0.08 } },
+  { id: 'l-monk',     slot: 'legs', name: 'Monk Trousers',    emoji: '🧎', rarity: 'rare', cost: 165, unlockLevel: 4,
+    description: '+10% XP on Mind & Wellbeing.', stats: { categoryBoost: { mind: 0.10 } } },
+  { id: 'l-titan',    slot: 'legs', name: 'Titan Greaves',    emoji: '🦿', rarity: 'legendary', cost: 760, unlockLevel: 13,
+    description: '+12% XP and +20% boss damage.', stats: { xpBoost: 0.12, bossDamage: 0.20 } },
+  { id: 'l-marathon', slot: 'legs', name: 'Marathon Leggings',emoji: '🦵', rarity: 'epic', cost: 380, unlockLevel: 10,
+    description: '+18% XP on Health & Body. Built for the long run.', stats: { categoryBoost: { health: 0.18 } } },
+  { id: 'l-stride',   slot: 'legs', name: 'Stride of Stars',  emoji: '⭐', rarity: 'mythic', cost: 1700, unlockLevel: 23,
+    description: '+18% XP and +12 min combo window.', stats: { xpBoost: 0.18, comboExtendMin: 12 } },
 
   // ─── FEET ───
   { id: 'f-sandal',   slot: 'feet', name: 'Cloth Sandals',    emoji: '🩴', rarity: 'common', cost: 25,
@@ -113,6 +149,14 @@ export const GEAR: GearItem[] = [
     description: 'Combo window holds 5 min longer.', stats: { comboExtendMin: 5 } },
   { id: 'f-bootstrap',slot: 'feet', name: 'Bootstraps of Will', emoji: '👢', rarity: 'epic', cost: 340, unlockLevel: 7,
     description: '+9% XP. Pull yourself up.', stats: { xpBoost: 0.09 } },
+  { id: 'f-runner',   slot: 'feet', name: 'Runners',          emoji: '👟', rarity: 'rare', cost: 160, unlockLevel: 4,
+    description: '+10% XP on Health & Body.', stats: { categoryBoost: { health: 0.10 } } },
+  { id: 'f-stealth',  slot: 'feet', name: 'Stealth Slippers', emoji: '🥿', rarity: 'epic', cost: 360, unlockLevel: 8,
+    description: '+10 min combo and +5% loot.', stats: { comboExtendMin: 10, lootBoost: 0.05 } },
+  { id: 'f-hermes',   slot: 'feet', name: 'Sandals of Hermes',emoji: '🪽', rarity: 'legendary', cost: 740, unlockLevel: 14,
+    description: '+14% XP and +12 min combo.', stats: { xpBoost: 0.14, comboExtendMin: 12 } },
+  { id: 'f-mythos',   slot: 'feet', name: 'Mythos Boots',     emoji: '👣', rarity: 'mythic', cost: 1650, unlockLevel: 25,
+    description: '+20% XP across all categories.', stats: { xpBoost: 0.20 } },
 
   // ─── WEAPON ───
   { id: 'w-stick',    slot: 'weapon', name: 'Wooden Stick',   emoji: '🪵', rarity: 'common', cost: 40,
@@ -123,6 +167,16 @@ export const GEAR: GearItem[] = [
     description: '+28% boss damage. Slays the inner demons.', stats: { bossDamage: 0.28 } },
   { id: 'w-excalibur',slot: 'weapon', name: 'Excaliburn of Discipline', emoji: '🔥', rarity: 'legendary', cost: 850, unlockLevel: 14,
     description: '+45% boss damage and +10% XP.', stats: { bossDamage: 0.45, xpBoost: 0.10 } },
+  { id: 'w-axe',      slot: 'weapon', name: 'Battle Axe',     emoji: '🪓', rarity: 'rare', cost: 200, unlockLevel: 5,
+    description: '+22% boss damage. Two-handed conviction.', stats: { bossDamage: 0.22 } },
+  { id: 'w-bow',      slot: 'weapon', name: 'Recurve of Reps',emoji: '🏹', rarity: 'epic', cost: 410, unlockLevel: 10,
+    description: '+35% boss damage. Quiet, accurate, lethal.', stats: { bossDamage: 0.35 } },
+  { id: 'w-staff',    slot: 'weapon', name: 'Staff of Stillness', emoji: '🪄', rarity: 'epic', cost: 430, unlockLevel: 11,
+    description: '+25% boss dmg and +6 min combo.', stats: { bossDamage: 0.25, comboExtendMin: 6 } },
+  { id: 'w-godslayer',slot: 'weapon', name: 'God-Slayer Blade',emoji: '🗡️', rarity: 'mythic', cost: 2200, unlockLevel: 28,
+    description: '+60% boss damage and +15% XP. End-game tier.', stats: { bossDamage: 0.60, xpBoost: 0.15 } },
+  { id: 'w-tomeward', slot: 'weapon', name: 'Tome of Wards',  emoji: '📓', rarity: 'legendary', cost: 720, unlockLevel: 12,
+    description: '+15% XP on Learning & Mastery and +15% boss dmg.', stats: { categoryBoost: { mastery: 0.15 }, bossDamage: 0.15 } },
 
   // ─── TRINKET ───
   { id: 't-penny',    slot: 'trinket', name: 'Lucky Penny',   emoji: '🪙', rarity: 'common', cost: 35,
@@ -133,6 +187,16 @@ export const GEAR: GearItem[] = [
     description: '+7% XP on all entries.', stats: { xpBoost: 0.07 } },
   { id: 't-phoenix',  slot: 'trinket', name: 'Phoenix Feather', emoji: '🪶', rarity: 'epic', cost: 420, unlockLevel: 9,
     description: '+10% XP, +10% loot, +1 streak save.', stats: { xpBoost: 0.10, lootBoost: 0.10, streakShield: 1 } },
+  { id: 't-amulet',   slot: 'trinket', name: 'Amulet of Vows',  emoji: '🧿', rarity: 'rare', cost: 195, unlockLevel: 5,
+    description: '+9% XP on every entry.', stats: { xpBoost: 0.09 } },
+  { id: 't-ring',     slot: 'trinket', name: 'Ring of Routine', emoji: '💍', rarity: 'epic', cost: 420, unlockLevel: 9,
+    description: '+12 min combo and +5% loot.', stats: { comboExtendMin: 12, lootBoost: 0.05 } },
+  { id: 't-eye',      slot: 'trinket', name: 'Eye of the Coach',emoji: '👁️', rarity: 'legendary', cost: 760, unlockLevel: 14,
+    description: '+15% XP and +2 streak saves.', stats: { xpBoost: 0.15, streakShield: 2 } },
+  { id: 't-crown',    slot: 'trinket', name: 'Crown of Compounding', emoji: '💎', rarity: 'mythic', cost: 2000, unlockLevel: 26,
+    description: '+25% XP and +20 min combo. The ultimate compounder.', stats: { xpBoost: 0.25, comboExtendMin: 20 } },
+  { id: 't-sigil',    slot: 'trinket', name: 'Sigil of the Self', emoji: '🌀', rarity: 'mythic', cost: 2400, unlockLevel: 30,
+    description: '+30% XP, +30% loot, +3 streak saves. End-game trinket.', stats: { xpBoost: 0.30, lootBoost: 0.30, streakShield: 3 } },
 ];
 
 export const GEAR_BY_ID: Record<string, GearItem> = Object.fromEntries(GEAR.map(g => [g.id, g]));

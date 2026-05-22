@@ -182,19 +182,7 @@ function getKey(opts?: { apiKey?: string }) {
 
 export async function analyzeEntry(text: string, opts?: { apiKey?: string; model?: string; memoryContext?: string }): Promise<EntryAnalysis> {
   const apiKey = getKey(opts);
-  // If no key, try the in-browser local AI first; fall back to heuristic.
-  if (!apiKey) {
-    try {
-      const { analyzeLocally, getLocalAIStatus } = await import('./localAI');
-      if (getLocalAIStatus().status === 'ready' || getLocalAIStatus().status === 'loading') {
-        return await analyzeLocally(text);
-      }
-      // Fire-and-forget warm-up + heuristic now
-      const { warmupLocalAI } = await import('./localAI');
-      warmupLocalAI();
-    } catch { /* ignore, fall through */ }
-    return heuristicAnalyze(text);
-  }
+  if (!apiKey) return heuristicAnalyze(text);
 
   const prov = pickProvider(apiKey);
   // Try selected model, then fall back through the free list on rate-limit/404 errors.

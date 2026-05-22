@@ -46,7 +46,7 @@ function clamp(n: number, lo: number, hi: number) { return Math.max(lo, Math.min
 
 // Phrases we explicitly forbid in AI quips. If the model echoes one, we
 // regenerate locally so the user sees something contextual instead.
-const FORBIDDEN_QUIP_RE = /(boss[- ]?tier behavior|past you is jealous|body said thanks|compound interest,?\s*alive|algorithm thanks you for your service|inner gremlin:?\s*fed|rough rep[- ]?next set|logged\.?\s*next\.?|on the board\.?|quiet mind,?\s*loud results)/i;
+const FORBIDDEN_QUIP_RE = /(boss[- ]?tier behavior|past you is jealous|body said thanks|compound interest,?\s*alive|algorithm thanks you for your service|inner gremlin:?\s*fed|rough rep[- ]?next set|logged\.?\s*next\.?|on the board\.?|quiet mind,?\s*loud results|that was rep one|where'?s rep two)/i;
 
 function contextualFallbackQuip(title: string, sentiment: string): string {
   const t = title.toLowerCase();
@@ -159,29 +159,30 @@ REFLECTION (OPTIONAL):
   - Use their own words/voice where possible.
   - If they didn't reflect, OMIT the field entirely (don't invent).
 
-QUIP — STRICTLY PERSONAL (≤90 chars). MUST reference something specific from THIS user's entry: the activity, the duration, the object, the time of day, or a feeling they wrote. Re-use of stock phrases is failure.
+QUIP — STRICTLY PERSONAL (≤90 chars). MUST name a SPECIFIC NOUN, VERB, NUMBER, or PERSON the user wrote in this entry. If the entry mentions "friend", "mom", "gym", "1h", "yoga" — your quip must literally include or directly play off that word.
 
-FORBIDDEN — these phrases are banned everywhere in your output:
+A quip that could appear on someone else's entry is wrong. A quip that doesn't quote their actual words is wrong.
+
+FORBIDDEN — these exact phrases are banned, and so is anything paraphrased from them:
   "Boss-tier behavior", "Past you is jealous", "Body said thanks", "Compound interest, alive",
   "The algorithm thanks you for your service", "Inner gremlin: fed", "Rough rep — next set?",
-  "Logged. Next.", "On the board.", "Quiet mind, loud results."
-Don't paraphrase them either. Write a NEW line that names what they actually did.
+  "Logged. Next.", "On the board.", "Quiet mind, loud results.", "That was rep one"
 
-GOOD positive quips (note how each names the actual action):
-  Entry: "ran 5km in park"        -> "Five clean kilometres before most people opened their eyes."
-  Entry: "studied calculus 1h"    -> "An hour staring down derivatives — chapter pays interest."
-  Entry: "cooked dinner with kids"-> "Kitchen chaos beats takeout every time."
-  Entry: "called dad after weeks" -> "Three weeks of silence broken in one phone call."
-
-GOOD negative quips (light roast, references the slip):
-  Entry: "scrolled tiktok 2h"   -> "Two hours of vertical video; the FYP wins this round."
-  Entry: "skipped gym again"    -> "Third gym skip this week — the dumbbells are forming opinions."
-  Entry: "ate whole pizza"      -> "A whole pizza solo is a confession, not a meal."
-  Entry: "stayed up till 3am"   -> "3am bedtime — tomorrow you is filing a complaint."
-
-GOOD neutral quips:
-  Entry: "had a sandwich"   -> "Sandwich logged. Calories accounted for."
-  Entry: "took a shower"    -> "Shower done. Reset button pressed."
+GOOD examples — note each quip uses words FROM the entry:
+  Entry: "ran 5km in park"             → "Five clean kilometres before the city woke up."
+  Entry: "studied calculus 1h"         → "An hour staring down calculus — chapter pays interest."
+  Entry: "cooked dinner with kids"     → "Dinner with the kids — kitchen chaos beats takeout every time."
+  Entry: "called dad after weeks"      → "Weeks of silence broken in one phone call to dad."
+  Entry: "called a friend to catch up" → "A friend caught up — the bond just earned interest."
+  Entry: "yoga 20min"                  → "Twenty minutes of yoga — the spine forgives a lot."
+  Entry: "meditated 10min"             → "Ten still minutes — first time you weren't on autopilot today."
+  Entry: "wrote 500 words"             → "Five hundred words. The page is no longer winning."
+  Entry: "scrolled tiktok 2h"          → "Two hours of TikTok — the FYP won; the project starved."
+  Entry: "skipped gym again"           → "Skipped the gym; the dumbbells are forming opinions."
+  Entry: "ate whole pizza"             → "Whole pizza, one human — confession dressed as dinner."
+  Entry: "stayed up till 3am"          → "3am bedtime — tomorrow-you is already filing complaints."
+  Entry: "drank water"                 → "Water in. Brain noises down. Small win."
+  Entry: "had a sandwich"              → "Sandwich logged. Carbs accounted for."
 
 TITLE: past-tense, 2-5 words, no filler.
 TONE: cheer | hype | roast | wry | gentle | sass

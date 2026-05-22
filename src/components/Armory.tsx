@@ -4,7 +4,7 @@ import { Coins, Check, ShieldCheck, Lock } from 'lucide-react';
 import { useHabitStore } from '../store/useHabitStore';
 import {
   GEAR, GEAR_BY_ID, GearItem, GearSlot, SLOT_EMOJI, SLOT_LABEL,
-  RARITY_COLOR, RARITY_GLOW, describeStats,
+  RARITY_COLOR, RARITY_GLOW, RARITY_ORDER, describeStats,
 } from '../lib/gear';
 import { levelFromXp } from '../lib/gamification';
 
@@ -29,7 +29,19 @@ export default function Armory() {
     return () => clearTimeout(t);
   }, [lastGear?.at]);
 
-  const itemsInSlot = GEAR.filter(g => g.slot === activeSlot);
+  const itemsInSlot = GEAR
+    .filter(g => g.slot === activeSlot)
+    .sort((a, b) => {
+      // Affordable + unlocked first, then locked-by-level, then locked-by-cost
+      const ar = RARITY_ORDER.indexOf(a.rarity);
+      const br = RARITY_ORDER.indexOf(b.rarity);
+      return ar - br || (a.unlockLevel ?? 0) - (b.unlockLevel ?? 0) || a.cost - b.cost;
+    });
+
+  // Closest locked-by-level item across the entire catalog — the carrot.
+  const nextLocked = GEAR
+    .filter(g => g.unlockLevel && g.unlockLevel > level && !owned.includes(g.id))
+    .sort((a, b) => (a.unlockLevel! - b.unlockLevel!) || a.cost - b.cost)[0];
 
   return (
     <div className="space-y-4">
@@ -44,6 +56,33 @@ export default function Armory() {
           <span className="text-[10px] uppercase tracking-wider text-[var(--muted-2)] ml-1">XP</span>
         </div>
       </div>
+
+      {/* Next-unlock motivational banner */}
+      {nextLocked && (
+        <div className="surface p-3 flex items-center gap-3 relative overflow-hidden"
+             style={{ borderColor: RARITY_COLOR[nextLocked.rarity], boxShadow: RARITY_GLOW[nextLocked.rarity] }}>
+          <div className="text-3xl grayscale opacity-50">{nextLocked.emoji}</div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] mono uppercase tracking-wider text-[var(--muted-2)]">
+              your next unlock at level <span className="text-[var(--accent)]">{nextLocked.unlockLevel}</span>
+            </div>
+            <div className="text-[14px] font-semibold flex items-center gap-2">
+              <span>{nextLocked.name}</span>
+              <span className="mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded"
+                    style={{ background: RARITY_COLOR[nextLocked.rarity], color: '#0a0a0b' }}>
+                {nextLocked.rarity}
+              </span>
+            </div>
+            <div className="text-[11px] text-[var(--muted)] mt-0.5">
+              {describeStats(nextLocked.stats).join(' · ')}
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-[10px] mono uppercase tracking-wider text-[var(--muted-2)]">levels away</div>
+            <div className="font-display text-2xl font-bold text-[var(--accent)] mono">{nextLocked.unlockLevel! - level}</div>
+          </div>
+        </div>
+      )}
 
       {/* Slot picker */}
       <div className="flex flex-wrap gap-1.5">
