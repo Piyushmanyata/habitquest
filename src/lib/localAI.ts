@@ -14,7 +14,10 @@ let pipelinePromise: Promise<any> | null = null;
 let listeners = new Set<() => void>();
 
 export function getLocalAIStatus() { return { status, progress }; }
-export function onLocalAIChange(cb: () => void) { listeners.add(cb); return () => listeners.delete(cb); }
+export function onLocalAIChange(cb: () => void): () => void {
+  listeners.add(cb);
+  return () => { listeners.delete(cb); };
+}
 function emit() { for (const cb of listeners) cb(); }
 
 async function getPipeline() {
