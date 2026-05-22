@@ -3,7 +3,6 @@
 // then caches in IndexedDB. Lazy-loaded after first paint.
 
 import { CATEGORIES, CAT_BY_ID } from './categories';
-import { pickQuip } from './quips';
 import { heuristicAnalyze } from './heuristic';
 import type { EntryAnalysis, ReactionTone } from './ai';
 
@@ -133,7 +132,8 @@ export async function analyzeLocally(rawText: string): Promise<EntryAnalysis> {
       sentiment === 'positive' ? (intensity >= 4 ? 'hype' : 'cheer') :
       sentiment === 'negative' ? (intensity >= 4 ? 'roast' : 'gentle') :
       'wry';
-    const quip = pickQuip({ parentId, sentiment, intensity, tone });
+    // Defer to the heuristic's contextual quip so we don't have stock phrases.
+    const quip = heuristicAnalyze(rawText).quip;
 
     return {
       parentId, subId, sentiment, intensity, xpDelta,

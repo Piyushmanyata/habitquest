@@ -350,12 +350,4 @@ EXAMPLE OUTPUT:
   return fallback();
 }
 
-// Kept for any callers that still expect plain text — legacy stub.
-export async function generateDailyRecapText(
-  entries: { title: string; sentiment: Sentiment; xpDelta: number }[],
-  opts?: { apiKey?: string }
-): Promise<string> {
-  const r = await generateDailyRecap(entries, opts);
-  return `${r.headline}\n${r.trend}\n${r.biggestWin}\n${r.biggestSlip}\n${r.patternCallout}\n${r.tomorrowMove}`;
-}
 

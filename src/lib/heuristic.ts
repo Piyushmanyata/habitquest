@@ -1,7 +1,7 @@
 // Local fallback analyzer. Designed to be smart enough that the app feels useful without an API key.
 import { CATEGORIES, ParentCategory, SubCategory } from './categories';
 import type { EntryAnalysis, Sentiment } from './ai';
-import { pickQuip } from './quips';
+// (lib/quips.ts no longer used — see contextualQuip below)
 
 const NEGATIVE_CUES = [
   'doom scroll','doomscroll','tiktok','instagram','reddit','twitter','x.com','youtube shorts','shorts','reels',
@@ -117,6 +117,41 @@ function titleize(s: string) {
   return t.slice(0, 57) + '…';
 }
 
+// Build a quip that pulls real words from the user's entry so we don't show stock phrases.
+function contextualQuip(rawText: string, sentiment: 'positive' | 'negative' | 'neutral'): string {
+  const text = rawText.toLowerCase();
+  const m = rawText.match(/(\d+(?:\.\d+)?\s*(?:min|mins|minute|minutes|hour|hours|hr|hrs|km|miles|mi|pages|pgs|reps|sets))/i);
+  const duration = m ? m[0] : null;
+
+  if (sentiment === 'positive') {
+    if (/run|ran|jog/.test(text))            return duration ? `${cap(duration)} of moving — past you is watching.` : 'Movement banked. The body remembers.';
+    if (/gym|lift|workout|squat/.test(text)) return duration ? `${cap(duration)} under iron — that's tomorrow's strength.` : 'Iron moved. Pay raise pending.';
+    if (/read|book|page/.test(text))         return duration ? `${cap(duration)} closer to the version that finishes the book.` : 'Pages turned, brain fed.';
+    if (/meditat|breathwork|breathe/.test(text)) return 'Still mind, loud impact.';
+    if (/study|learn|course|practice/.test(text)) return 'Skill tree just got a tiny watering.';
+    if (/cook|meal|salad|vegetable/.test(text)) return 'Real food, real fuel. No takeout regret.';
+    if (/call|text|catch up|family|mom|dad|friend/.test(text)) return 'Connection > content. Banked.';
+    if (/water|hydrat/.test(text))           return 'Drop by drop. Brain thanks you.';
+    if (/journal|reflect|gratitude/.test(text)) return 'Honest paper beats noisy head.';
+    if (/clean|tidy|organize/.test(text))    return 'Order outside, order inside.';
+    if (/save|invest|budget/.test(text))     return 'Future you is quietly impressed.';
+    return duration ? `${cap(duration)} done — that counts.` : 'Quiet rep, real progress.';
+  }
+  if (sentiment === 'negative') {
+    if (/tiktok|reels|shorts|scroll/.test(text)) return duration ? `${cap(duration)} of scroll — the FYP got fed.` : 'The feed wins this round.';
+    if (/junk|sugar|soda|candy|chips|pizza|takeout|fast food/.test(text)) return 'A sweet hit now, a quiet regret later.';
+    if (/smoke|vape|cig/.test(text))         return 'Lungs are quietly filing a complaint.';
+    if (/drink|drank|alcohol|beer|wine/.test(text)) return 'Tomorrow you is already negotiating.';
+    if (/skip|missed|didn'?t|didnt/.test(text)) return 'Skipped rep — story is still rewritable.';
+    if (/lazy|nap|slept in|overslept/.test(text)) return 'Couch claimed the round.';
+    if (/argued|yelled|fight/.test(text))    return 'Volume up, signal down. Reset later.';
+    return 'Logged honestly — that\'s the actual move.';
+  }
+  return 'Counted. Quietly.';
+}
+
+function cap(s: string) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
 export function heuristicAnalyze(rawText: string): EntryAnalysis {
   const text = tokenize(rawText);
   const cat = bestCategory(text);
@@ -124,7 +159,6 @@ export function heuristicAnalyze(rawText: string): EntryAnalysis {
   const fallbackSub = cat.score === 0 ? fallbackParent.subs[fallbackParent.subs.length - 1] : cat.sub;
   const { sentiment, intensity } = inferSentiment(text, fallbackParent.id);
   const xpDelta = computeDelta(sentiment, intensity);
-  // delegate to shared rich quip library
   return {
     parentId: fallbackParent.id,
     subId: fallbackSub.id,
@@ -136,7 +170,7 @@ export function heuristicAnalyze(rawText: string): EntryAnalysis {
       sentiment === 'positive' ? 'Positive action with measurable effort.' :
       sentiment === 'negative' ? 'Language suggests a setback or unhealthy choice.' :
       'No strong positive or negative cues.',
-    quip: pickQuip({ parentId: fallbackParent.id, sentiment, intensity, tone: sentiment === 'positive' ? 'cheer' : sentiment === 'negative' ? 'roast' : 'wry' }),
+    quip: contextualQuip(rawText, sentiment),
     tone: sentiment === 'positive' ? 'cheer' : sentiment === 'negative' ? 'roast' : 'wry',
     source: 'rules',
     emotion: guessEmotion(text, sentiment),

@@ -44,6 +44,36 @@ function extractJson(text: string): any | null {
 const ALLOWED_TONES: ReactionTone[] = ['cheer','hype','roast','wry','gentle','sass'];
 function clamp(n: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, n)); }
 
+// Phrases we explicitly forbid in AI quips. If the model echoes one, we
+// regenerate locally so the user sees something contextual instead.
+const FORBIDDEN_QUIP_RE = /(boss[- ]?tier behavior|past you is jealous|body said thanks|compound interest,?\s*alive|algorithm thanks you for your service|inner gremlin:?\s*fed|rough rep[- ]?next set|logged\.?\s*next\.?|on the board\.?|quiet mind,?\s*loud results)/i;
+
+function contextualFallbackQuip(title: string, sentiment: string): string {
+  const t = title.toLowerCase();
+  const grab = (re: RegExp) => { const m = title.match(re); return m ? m[0] : null; };
+  const num = grab(/\d+\s*(?:min|mins|minute|minutes|hour|hours|hr|hrs|km|miles|mi|pages|reps|sets)?/i);
+
+  if (sentiment === 'positive') {
+    if (num)              return `${num[0].toUpperCase()}${num.slice(1)} done — that counts.`;
+    if (/run|ran|jog/.test(t))      return 'Every step compounded. Filed.';
+    if (/read|book|pages?/.test(t)) return 'Pages turned, brain fed. Stack it.';
+    if (/gym|lift|workout/.test(t)) return 'Iron moved. Tomorrow notices.';
+    if (/meditat/.test(t))           return 'A quiet rep is still a rep.';
+    if (/call|text|message/.test(t))return 'Connection > content. Banked.';
+    if (/cook|meal|ate/.test(t))    return 'Real food, real fuel.';
+    return `"${title}" — banked into the long version of you.`;
+  }
+  if (sentiment === 'negative') {
+    if (/tiktok|scroll|reels|shorts/.test(t)) return 'The feed wins this round. Reroll soon.';
+    if (/junk|chips|sugar|soda|pizza/.test(t)) return 'A sweet hit now, a quiet regret later.';
+    if (/smoke|vape|drink|alcohol/.test(t)) return 'Borrowing from tomorrow at terrible rates.';
+    if (/skip|missed|didn't|didnt/.test(t)) return 'A skipped rep is a story you can still rewrite.';
+    if (/lazy|nap|slept in/.test(t)) return 'Couch claimed the round. Get up next one.';
+    return `Slip logged: "${title}" — no shame, just data.`;
+  }
+  return `"${title}" — counted, quietly.`;
+}
+
 function validateOne(raw: any, originalText: string): EntryAnalysis | null {
   if (!raw || typeof raw !== 'object') return null;
   const parent = CAT_BY_ID[raw.parent_id];
@@ -68,11 +98,17 @@ function validateOne(raw: any, originalText: string): EntryAnalysis | null {
   const reflection = typeof raw.reflection === 'string' && raw.reflection.trim().length > 0
     ? String(raw.reflection).slice(0, 240)
     : undefined;
+
+  const title = String(raw.title || '').slice(0, 80) || originalText.slice(0, 60);
+  let quip = String(raw.quip || '').slice(0, 140);
+  // If the model emitted a banned cliche, swap it for a contextual line.
+  if (!quip || FORBIDDEN_QUIP_RE.test(quip)) quip = contextualFallbackQuip(title, sentiment);
+
   return {
     parentId: parent.id, subId: sub.id, sentiment, intensity, xpDelta,
-    title: String(raw.title || '').slice(0, 80) || originalText.slice(0, 60),
+    title,
     reasoning: String(raw.reasoning || '').slice(0, 200),
-    quip: String(raw.quip || '').slice(0, 140),
+    quip,
     tone, source: 'ai' as const,
     emotion, emotionIntensity, reflection,
   };
@@ -123,10 +159,29 @@ REFLECTION (OPTIONAL):
   - Use their own words/voice where possible.
   - If they didn't reflect, OMIT the field entirely (don't invent).
 
-QUIP STYLE (<=90 chars, Sage's voice — never generic, never sycophantic):
-  positive: "Past you is jealous." | "Compound interest, alive." | "Body said thanks." | "Boss-tier behavior."
-  negative: "The algorithm thanks you for your service." | "Inner gremlin: fed. Refund?" | "Rough rep — next set?"
-  neutral:  "Logged. Next." | "On the board."
+QUIP — STRICTLY PERSONAL (≤90 chars). MUST reference something specific from THIS user's entry: the activity, the duration, the object, the time of day, or a feeling they wrote. Re-use of stock phrases is failure.
+
+FORBIDDEN — these phrases are banned everywhere in your output:
+  "Boss-tier behavior", "Past you is jealous", "Body said thanks", "Compound interest, alive",
+  "The algorithm thanks you for your service", "Inner gremlin: fed", "Rough rep — next set?",
+  "Logged. Next.", "On the board.", "Quiet mind, loud results."
+Don't paraphrase them either. Write a NEW line that names what they actually did.
+
+GOOD positive quips (note how each names the actual action):
+  Entry: "ran 5km in park"        -> "Five clean kilometres before most people opened their eyes."
+  Entry: "studied calculus 1h"    -> "An hour staring down derivatives — chapter pays interest."
+  Entry: "cooked dinner with kids"-> "Kitchen chaos beats takeout every time."
+  Entry: "called dad after weeks" -> "Three weeks of silence broken in one phone call."
+
+GOOD negative quips (light roast, references the slip):
+  Entry: "scrolled tiktok 2h"   -> "Two hours of vertical video; the FYP wins this round."
+  Entry: "skipped gym again"    -> "Third gym skip this week — the dumbbells are forming opinions."
+  Entry: "ate whole pizza"      -> "A whole pizza solo is a confession, not a meal."
+  Entry: "stayed up till 3am"   -> "3am bedtime — tomorrow you is filing a complaint."
+
+GOOD neutral quips:
+  Entry: "had a sandwich"   -> "Sandwich logged. Calories accounted for."
+  Entry: "took a shower"    -> "Shower done. Reset button pressed."
 
 TITLE: past-tense, 2-5 words, no filler.
 TONE: cheer | hype | roast | wry | gentle | sass
@@ -149,26 +204,26 @@ OUTPUT — strict JSON, single object with field "entries" (array). No markdown.
   }
 ]}
 
-FEW-SHOT:
+FULL FEW-SHOT (note the quips name specific words from each entry):
 
 Input: "ran 5km in the park this morning, felt amazing afterward, my head finally cleared"
 Output: {"entries":[{
   "parent_id":"health","sub_id":"fitness","sentiment":"positive","intensity":4,"xp_delta":33,
-  "title":"Ran 5km","reasoning":"Solid morning cardio","quip":"Past you is jealous.","tone":"hype",
+  "title":"Ran 5km","reasoning":"Solid morning cardio","quip":"Five clean kilometres while the city was still yawning.","tone":"hype",
   "emotion":"energized","emotion_intensity":3,
   "reflection":"Head finally cleared after the run."
 }]}
 
-Input: "went to gym and read 30 pages and then doom-scrolled for 1 hour. felt ashamed at the end"
+Input: "went to gym 45 min and read 30 pages and then doom-scrolled tiktok 1h. felt ashamed at the end"
 Output: {"entries":[
 {"parent_id":"health","sub_id":"fitness","sentiment":"positive","intensity":3,"xp_delta":26,
- "title":"Gym session","reasoning":"Strength training, full effort","quip":"Body said thanks.","tone":"cheer",
+ "title":"Gym 45 min","reasoning":"Full-effort lifting block","quip":"Forty-five minutes under iron — that's tomorrow's strength compounding.","tone":"cheer",
  "emotion":"pride","emotion_intensity":2},
 {"parent_id":"mastery","sub_id":"reading","sentiment":"positive","intensity":3,"xp_delta":26,
- "title":"Read 30 pages","reasoning":"Meaningful reading block","quip":"Compound interest, alive.","tone":"cheer",
+ "title":"Read 30 pages","reasoning":"Meaningful reading block","quip":"Thirty pages closer to the version of you who finishes the book.","tone":"cheer",
  "emotion":"focused","emotion_intensity":2},
 {"parent_id":"breaking","sub_id":"screen","sentiment":"negative","intensity":3,"xp_delta":-15,
- "title":"Scrolled 1 hour","reasoning":"Whole hour to the algorithm","quip":"The algorithm thanks you for your service.","tone":"roast",
+ "title":"Scrolled TikTok 1h","reasoning":"Long passive screen block","quip":"One hour of TikTok — the FYP got fed, your project starved.","tone":"roast",
  "emotion":"shame","emotion_intensity":2,
  "reflection":"Felt ashamed at the end."}
 ]}
@@ -176,9 +231,23 @@ Output: {"entries":[
 Input: "meditated 10 min. felt calm and present for the first time today."
 Output: {"entries":[{
   "parent_id":"mind","sub_id":"meditation","sentiment":"positive","intensity":1,"xp_delta":12,
-  "title":"Meditated 10 min","reasoning":"Short, daily-quality rep","quip":"Quiet mind, loud results.","tone":"cheer",
+  "title":"Meditated 10 min","reasoning":"Short, daily-quality rep","quip":"Ten minutes still — the first sliver of presence in the day.","tone":"cheer",
   "emotion":"calm","emotion_intensity":3,
   "reflection":"First moment of presence all day."
+}]}
+
+Input: "ate a whole pizza alone"
+Output: {"entries":[{
+  "parent_id":"health","sub_id":"nutrition","sentiment":"negative","intensity":2,"xp_delta":-11,
+  "title":"Whole pizza solo","reasoning":"Indulgence without a pass","quip":"A whole pie, solo — that's a confession, not a meal.","tone":"sass",
+  "emotion":"shame","emotion_intensity":2
+}]}
+
+Input: "called grandma after weeks of silence"
+Output: {"entries":[{
+  "parent_id":"social","sub_id":"family","sentiment":"positive","intensity":2,"xp_delta":19,
+  "title":"Called grandma","reasoning":"Long-overdue reconnection","quip":"Weeks of silence — broken by the bravest button on your phone.","tone":"gentle",
+  "emotion":"gratitude","emotion_intensity":3
 }]}`;
 }
 
@@ -200,7 +269,7 @@ async function callWithFallback(system: string, user: string): Promise<any | nul
             { role: 'system', content: system },
             { role: 'user', content: user },
           ],
-          temperature: 0.6, max_tokens: 700,
+          temperature: 0.9, max_tokens: 800,
           response_format: { type: 'json_object' },
         }),
       });
