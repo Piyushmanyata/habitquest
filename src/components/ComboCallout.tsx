@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import { useHabitStore } from '../store/useHabitStore';
+import { sfxComboTier } from '../lib/sfx';
 
 const TIERS: { combo: number; label: string; color: string; glow: string }[] = [
   { combo: 3,  label: 'TRIPLE!',   color: '#c2f54a', glow: 'rgba(194,245,74,0.55)' },
@@ -51,7 +52,7 @@ export default function ComboCallout() {
       const idx = TIERS.findIndex(t => t.combo === combo);
       if (idx >= 0) {
         setShown({ idx, at: Date.now() });
-        tierFanfare(idx);
+        sfxComboTier(idx);
         const t = setTimeout(() => setShown(null), 1500);
         return () => clearTimeout(t);
       }

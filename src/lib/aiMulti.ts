@@ -61,12 +61,20 @@ function validateOne(raw: any, originalText: string): EntryAnalysis | null {
   if (sentiment === 'negative' && xpDelta > 0) xpDelta = -Math.abs(xpDelta);
   const tone: ReactionTone = ALLOWED_TONES.includes(raw.tone) ? raw.tone
     : sentiment === 'positive' ? 'cheer' : sentiment === 'negative' ? 'roast' : 'wry';
+  const emotion = typeof raw.emotion === 'string' && raw.emotion.length < 20 ? raw.emotion : undefined;
+  const emotionIntensity = Number.isFinite(Number(raw.emotion_intensity))
+    ? clamp(Math.round(Number(raw.emotion_intensity)), 1, 3)
+    : undefined;
+  const reflection = typeof raw.reflection === 'string' && raw.reflection.trim().length > 0
+    ? String(raw.reflection).slice(0, 240)
+    : undefined;
   return {
     parentId: parent.id, subId: sub.id, sentiment, intensity, xpDelta,
     title: String(raw.title || '').slice(0, 80) || originalText.slice(0, 60),
     reasoning: String(raw.reasoning || '').slice(0, 200),
     quip: String(raw.quip || '').slice(0, 140),
     tone, source: 'ai' as const,
+    emotion, emotionIntensity, reflection,
   };
 }
 
@@ -97,9 +105,23 @@ SPLITTING RULES:
 PER-ENTRY SCORING:
 INTENSITY 1..5: 1=token (5min walk), 2=small (15min), 3=moderate (30-45min), 4=heavy (1h+), 5=epic (multi-hour milestone)
 SENTIMENT + XP:
-  positive (grew the user)      xp = +(5 + intensity*7)  -> +12..+40
-  negative (cheap dopamine slip) xp = -(5 + intensity*7)  -> -12..-40
+  positive (grew the user)       xp = +(5 + intensity*7)  -> +12..+40
+  negative (cheap dopamine slip) xp = -(3 + intensity*4)  -> -7..-23  ← intentionally soft so users still log honestly
   neutral                        xp in -3..+3
+
+EMOTION (REQUIRED — pick one from this exact list, never invent new ones):
+  pleasant-high: joy, pride, energized, focused
+  pleasant-low:  calm, gratitude
+  unpleasant-high: anxious, frustrated
+  unpleasant-low:  shame, lonely, tired
+  neutral:       bored, neutral
+emotion_intensity: 1..3 (faint / clear / strong)
+
+REFLECTION (OPTIONAL):
+  If the user wrote a thought, feeling, or self-observation alongside the action, EXTRACT it as a short reflection.
+  - Past-tense, ≤22 words.
+  - Use their own words/voice where possible.
+  - If they didn't reflect, OMIT the field entirely (don't invent).
 
 QUIP STYLE (<=90 chars, Sage's voice — never generic, never sycophantic):
   positive: "Past you is jealous." | "Compound interest, alive." | "Body said thanks." | "Boss-tier behavior."
@@ -109,29 +131,55 @@ QUIP STYLE (<=90 chars, Sage's voice — never generic, never sycophantic):
 TITLE: past-tense, 2-5 words, no filler.
 TONE: cheer | hype | roast | wry | gentle | sass
 
-OUTPUT — strict JSON, single object whose ONLY field is "entries" (array). No markdown.
+OUTPUT — strict JSON, single object with field "entries" (array). No markdown.
 {"entries":[
-  {"parent_id":"...","sub_id":"...","sentiment":"positive|negative|neutral","intensity":1-5,"xp_delta": signed int, "title":"...","reasoning":"<=14 words","quip":"...","tone":"cheer|hype|roast|wry|gentle|sass"}
+  {
+    "parent_id": "...",
+    "sub_id": "...",
+    "sentiment": "positive|negative|neutral",
+    "intensity": 1-5,
+    "xp_delta": signed int,
+    "title": "Past-tense 2-5 words",
+    "reasoning": "≤14 words",
+    "quip": "in-character reaction",
+    "tone": "cheer|hype|roast|wry|gentle|sass",
+    "emotion": "one of the allowed ids",
+    "emotion_intensity": 1-3,
+    "reflection": "optional, only if the user wrote a thought"
+  }
 ]}
 
 FEW-SHOT:
 
-Input: "ran 5km in the park this morning"
-Output: {"entries":[{"parent_id":"health","sub_id":"fitness","sentiment":"positive","intensity":4,"xp_delta":33,"title":"Ran 5km","reasoning":"Solid morning cardio","quip":"Past you is jealous.","tone":"hype"}]}
+Input: "ran 5km in the park this morning, felt amazing afterward, my head finally cleared"
+Output: {"entries":[{
+  "parent_id":"health","sub_id":"fitness","sentiment":"positive","intensity":4,"xp_delta":33,
+  "title":"Ran 5km","reasoning":"Solid morning cardio","quip":"Past you is jealous.","tone":"hype",
+  "emotion":"energized","emotion_intensity":3,
+  "reflection":"Head finally cleared after the run."
+}]}
 
-Input: "went to gym and read 30 pages and then doom-scrolled for 1 hour"
+Input: "went to gym and read 30 pages and then doom-scrolled for 1 hour. felt ashamed at the end"
 Output: {"entries":[
-{"parent_id":"health","sub_id":"fitness","sentiment":"positive","intensity":3,"xp_delta":26,"title":"Gym session","reasoning":"Strength training, full effort","quip":"Body said thanks.","tone":"cheer"},
-{"parent_id":"mastery","sub_id":"reading","sentiment":"positive","intensity":3,"xp_delta":26,"title":"Read 30 pages","reasoning":"Meaningful reading block","quip":"Compound interest, alive.","tone":"cheer"},
-{"parent_id":"breaking","sub_id":"screen","sentiment":"negative","intensity":3,"xp_delta":-26,"title":"Scrolled 1 hour","reasoning":"Whole hour to the algorithm","quip":"The algorithm thanks you for your service.","tone":"roast"}
+{"parent_id":"health","sub_id":"fitness","sentiment":"positive","intensity":3,"xp_delta":26,
+ "title":"Gym session","reasoning":"Strength training, full effort","quip":"Body said thanks.","tone":"cheer",
+ "emotion":"pride","emotion_intensity":2},
+{"parent_id":"mastery","sub_id":"reading","sentiment":"positive","intensity":3,"xp_delta":26,
+ "title":"Read 30 pages","reasoning":"Meaningful reading block","quip":"Compound interest, alive.","tone":"cheer",
+ "emotion":"focused","emotion_intensity":2},
+{"parent_id":"breaking","sub_id":"screen","sentiment":"negative","intensity":3,"xp_delta":-15,
+ "title":"Scrolled 1 hour","reasoning":"Whole hour to the algorithm","quip":"The algorithm thanks you for your service.","tone":"roast",
+ "emotion":"shame","emotion_intensity":2,
+ "reflection":"Felt ashamed at the end."}
 ]}
 
-Input: "meditated 10 minutes. ate a cheat meal. called mom."
-Output: {"entries":[
-{"parent_id":"mind","sub_id":"meditation","sentiment":"positive","intensity":1,"xp_delta":12,"title":"Meditated 10 min","reasoning":"Short, daily-quality rep","quip":"Quiet mind, loud results.","tone":"cheer"},
-{"parent_id":"health","sub_id":"nutrition","sentiment":"negative","intensity":3,"xp_delta":-26,"title":"Ate cheat meal","reasoning":"Indulgent meal, no pass used","quip":"Tomorrow's salad is plotting revenge.","tone":"sass"},
-{"parent_id":"social","sub_id":"family","sentiment":"positive","intensity":2,"xp_delta":19,"title":"Called mom","reasoning":"Real connection, no scrolling","quip":"Bonds are XP too.","tone":"gentle"}
-]}`;
+Input: "meditated 10 min. felt calm and present for the first time today."
+Output: {"entries":[{
+  "parent_id":"mind","sub_id":"meditation","sentiment":"positive","intensity":1,"xp_delta":12,
+  "title":"Meditated 10 min","reasoning":"Short, daily-quality rep","quip":"Quiet mind, loud results.","tone":"cheer",
+  "emotion":"calm","emotion_intensity":3,
+  "reflection":"First moment of presence all day."
+}]}`;
 }
 
 async function callWithFallback(system: string, user: string): Promise<any | null> {

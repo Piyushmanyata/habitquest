@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { useHabitStore } from '../store/useHabitStore';
 import { BADGES } from '../lib/gamification';
+import { sfxAchievement } from '../lib/sfx';
 
 type Reveal = { kind: 'built'; emoji: string; name: string; description: string; at: number }
             | { kind: 'custom'; emoji: string; name: string; description: string; at: number; recurring: boolean };
@@ -20,6 +21,7 @@ export default function AchievementReveal() {
     const badge = BADGES.find(b => b.id === lastBuilt.id);
     if (!badge) return;
     setShown({ kind: 'built', emoji: badge.emoji, name: badge.name, description: badge.description, at: lastBuilt.at });
+    sfxAchievement();
     confetti({ particleCount: 200, spread: 120, startVelocity: 45, origin: { y: 0.4 }, colors: ['#c2f54a','#ffd43b','#ffffff','#ec4899'] });
     const t = setTimeout(() => { setShown(null); clearBuilt(); }, 3200);
     return () => clearTimeout(t);
@@ -30,6 +32,7 @@ export default function AchievementReveal() {
     if (!lastCustom) return;
     const b = lastCustom.badge;
     setShown({ kind: 'custom', emoji: b.emoji, name: b.name, description: b.description, at: lastCustom.at, recurring: b.recurring });
+    sfxAchievement();
     confetti({ particleCount: 260, spread: 140, startVelocity: 50, origin: { y: 0.4 }, colors: ['#a855f7','#7dd3fc','#c2f54a','#ffd43b','#ffffff'] });
     setTimeout(() => confetti({ particleCount: 120, spread: 90, origin: { x: 0.2, y: 0.5 } }), 180);
     setTimeout(() => confetti({ particleCount: 120, spread: 90, origin: { x: 0.8, y: 0.5 } }), 360);

@@ -26,10 +26,11 @@ import ComboCallout from './components/ComboCallout';
 import Logs from './components/Logs';
 import StreakCalendar from './components/StreakCalendar';
 import CoachChat from './components/CoachChat';
+import MoodPanel from './components/MoodPanel';
 import { useHabitStore } from './store/useHabitStore';
 import { warmupLocalAI } from './lib/localAI';
 
-type Tab = 'journal' | 'logs' | 'analytics' | 'shop';
+type Tab = 'journal' | 'logs' | 'analytics' | 'mood' | 'shop';
 
 export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -51,7 +52,8 @@ export default function App() {
         if (e.key === '1') setTab('journal');
         if (e.key === '2') setTab('logs');
         if (e.key === '3') setTab('analytics');
-        if (e.key === '4') setTab('shop');
+        if (e.key === '4') setTab('mood');
+        if (e.key === '5') setTab('shop');
         if (e.key === 'r' || e.key === 'R') setRecapOpen(true);
         if (e.key === ',' ) setSettingsOpen(true);
       }
@@ -68,7 +70,8 @@ export default function App() {
         <TabBtn name="journal"   active={tab === 'journal'}   onClick={() => setTab('journal')}   kbd="1" />
         <TabBtn name="logs"      active={tab === 'logs'}      onClick={() => setTab('logs')}      kbd="2" />
         <TabBtn name="analytics" active={tab === 'analytics'} onClick={() => setTab('analytics')} kbd="3" />
-        <TabBtn name="shop"      active={tab === 'shop'}      onClick={() => setTab('shop')}      kbd="4" />
+        <TabBtn name="mood"      active={tab === 'mood'}      onClick={() => setTab('mood')}      kbd="4" />
+        <TabBtn name="shop"      active={tab === 'shop'}      onClick={() => setTab('shop')}      kbd="5" />
         <TrophyChip />
         <div className="ml-auto"><AiStatus /></div>
       </div>
@@ -97,6 +100,7 @@ export default function App() {
       )}
       {tab === 'logs'      && <Logs />}
       {tab === 'analytics' && <Analytics />}
+      {tab === 'mood'      && <MoodPanel />}
       {tab === 'shop'      && <Shop />}
 
       <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} />

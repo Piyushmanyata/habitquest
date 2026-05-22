@@ -3,27 +3,9 @@ import { useEffect, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { useHabitStore } from '../store/useHabitStore';
 import { levelFromXp } from '../lib/gamification';
+import { sfxLevelUp } from '../lib/sfx';
 
-function playLevelUp() {
-  try {
-    const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
-    if (!Ctx) return;
-    const ctx = new Ctx();
-    const notes = [523, 659, 784, 1047]; // C E G C — major arpeggio
-    notes.forEach((f, i) => {
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.connect(g); g.connect(ctx.destination);
-      o.type = 'triangle';
-      const t0 = ctx.currentTime + i * 0.08;
-      o.frequency.setValueAtTime(f, t0);
-      g.gain.setValueAtTime(0.0001, t0);
-      g.gain.exponentialRampToValueAtTime(0.12, t0 + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.35);
-      o.start(t0); o.stop(t0 + 0.4);
-    });
-  } catch {}
-}
+const playLevelUp = sfxLevelUp;
 
 export default function LevelUpBanner() {
   const xp = useHabitStore(s => s.profile.xp);

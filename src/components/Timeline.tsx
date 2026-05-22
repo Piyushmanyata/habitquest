@@ -1,7 +1,8 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trash2, Loader2 } from 'lucide-react';
+import { Trash2, Loader2, MessageSquareQuote } from 'lucide-react';
 import { useHabitStore, Entry } from '../store/useHabitStore';
 import { CAT_BY_ID, findSub } from '../lib/categories';
+import { EMOTION_BY_ID } from '../lib/emotions';
 import { useMemo } from 'react';
 
 function relTime(iso: string) {
@@ -90,13 +91,27 @@ function Row({ e, onDelete }: { e: Entry; onDelete: (id: string) => void }) {
           </div>
         )}
         <div className="mt-1 text-[11px] text-[var(--muted-2)] leading-relaxed">{e.reasoning}</div>
+        {e.reflection && (
+          <div className="mt-2 pl-2.5 border-l-2 hairline-2 text-[12.5px] text-[var(--fg)] leading-snug flex items-start gap-1.5">
+            <MessageSquareQuote className="w-3 h-3 mt-0.5 text-[var(--muted-2)] shrink-0" />
+            <span>{e.reflection}</span>
+          </div>
+        )}
         <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+          {e.emotion && EMOTION_BY_ID[e.emotion] && (
+            <span className="chip" title={`Mood: ${EMOTION_BY_ID[e.emotion].label}`}>
+              <span>{EMOTION_BY_ID[e.emotion].emoji}</span>{EMOTION_BY_ID[e.emotion].label}
+            </span>
+          )}
           {parent && sub && (
             <span className="chip"><span>{parent.emoji}</span>{parent.name} · {sub.name}</span>
           )}
           <span className={`chip ${isPos ? 'chip-pos' : isNeg ? 'chip-neg' : ''} mono`}>
             {sign}{e.xpDelta} XP
           </span>
+          {!!e.bonusXp && e.bonusXp > 0 && (
+            <span className="chip chip-info mono text-[10px]" title="Journal bonuses">+{e.bonusXp} bonus</span>
+          )}
           {e.multiplierAtTime > 1 && (
             <span className="chip mono text-[10px]" title="combo multiplier">×{e.multiplierAtTime.toFixed(2)}</span>
           )}

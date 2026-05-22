@@ -88,8 +88,27 @@ function inferSentiment(text: string, parentId: string): { sentiment: Sentiment;
 
 function computeDelta(sentiment: Sentiment, intensity: number): number {
   if (sentiment === 'positive') return 6 + intensity * 5;     // +11..+31
-  if (sentiment === 'negative') return -(6 + intensity * 5);  // -11..-31
+  if (sentiment === 'negative') return -(3 + intensity * 4);  // -7..-23  (soft, honest-log friendly)
   return 3;
+}
+
+function guessEmotion(text: string, sentiment: 'positive' | 'negative' | 'neutral'): string {
+  const t = text.toLowerCase();
+  // Pull a hint from explicit feeling words.
+  if (/\b(amazing|great|awesome|happy|loved|excited|stoked|joy)\b/.test(t)) return 'joy';
+  if (/\b(proud|nailed|crushed|killed)\b/.test(t))                          return 'pride';
+  if (/\b(calm|peace|quiet|relaxed|presence|present)\b/.test(t))             return 'calm';
+  if (/\b(energ|alive|fired|charged|hyped)\b/.test(t))                      return 'energized';
+  if (/\b(focus|deep|locked in|in the zone)\b/.test(t))                     return 'focused';
+  if (/\b(grateful|thankful|blessed)\b/.test(t))                            return 'gratitude';
+  if (/\b(anx|worried|stressed|panic|on edge)\b/.test(t))                   return 'anxious';
+  if (/\b(angry|frustrated|mad|annoyed|fed up)\b/.test(t))                  return 'frustrated';
+  if (/\b(ashamed|guilty|disappoint|regret)\b/.test(t))                     return 'shame';
+  if (/\b(tired|exhausted|drained|sleepy|knackered)\b/.test(t))             return 'tired';
+  if (/\b(lonely|alone|isolated)\b/.test(t))                                return 'lonely';
+  if (/\b(bored|meh|dull)\b/.test(t))                                       return 'bored';
+  // Fallback by sentiment.
+  return sentiment === 'positive' ? 'focused' : sentiment === 'negative' ? 'frustrated' : 'neutral';
 }
 
 function titleize(s: string) {
@@ -120,5 +139,7 @@ export function heuristicAnalyze(rawText: string): EntryAnalysis {
     quip: pickQuip({ parentId: fallbackParent.id, sentiment, intensity, tone: sentiment === 'positive' ? 'cheer' : sentiment === 'negative' ? 'roast' : 'wry' }),
     tone: sentiment === 'positive' ? 'cheer' : sentiment === 'negative' ? 'roast' : 'wry',
     source: 'rules',
+    emotion: guessEmotion(text, sentiment),
+    emotionIntensity: Math.max(1, Math.min(3, Math.ceil(intensity / 2))),
   };
 }

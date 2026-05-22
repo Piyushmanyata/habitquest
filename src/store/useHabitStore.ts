@@ -37,7 +37,11 @@ export type Entry = {
   tone: ReactionTone;
   source: 'ai' | 'rules';
   analyzing?: boolean;
-  batchId?: string;   // groups entries logged together (multi-entry parse)
+  batchId?: string;
+  emotion?: string;
+  emotionIntensity?: number;
+  reflection?: string;
+  bonusXp?: number;        // honest-log + reflection + emotion bonuses (already included in xpDelta)
 };
 
 type Profile = { xp: number; perfectDays: number; longestStreak: number; bossesDefeated: number };
@@ -228,14 +232,24 @@ function applyOneEntry(quick: EntryAnalysis, batchId: string, get: any, set: any
   const sNow = get();
   const liveCombo = Date.now() < sNow.comboExpiresAt ? sNow.combo : 0;
 
-  const baseDelta = quick.xpDelta;
+  let baseDelta = quick.xpDelta;
+  // Penalty leeway — soften negative XP so users still log slips honestly.
+  if (quick.sentiment === 'negative') baseDelta = Math.max(-25, baseDelta);
+
   let mult = quick.sentiment === 'positive' ? multiplierFor(liveCombo) : 1;
   const useFocus = sNow.buffs.focus && quick.sentiment === 'positive';
   const useCrit  = sNow.buffs.crit  && quick.sentiment === 'positive';
   if (useFocus) mult *= 2;
   if (useCrit)  mult *= 3;
   if (quick.sentiment === 'positive' && sNow.trophy && Date.now() < sNow.trophy.expiresAt) mult *= 1.1;
-  const xpDelta = Math.round(baseDelta * mult);
+  let xpDelta = Math.round(baseDelta * mult);
+
+  // Bonuses for richer journaling
+  let bonusXp = 0;
+  if (quick.sentiment === 'negative') bonusXp += 3;           // honest-log bonus
+  if (quick.reflection)                bonusXp += 5;          // wrote a reflection
+  if (quick.emotion && quick.emotion !== 'neutral') bonusXp += 3; // tagged an emotion
+  xpDelta += bonusXp;
 
   const entry: Entry = {
     id, text: quick.title, title: quick.title,
@@ -247,6 +261,10 @@ function applyOneEntry(quick: EntryAnalysis, batchId: string, get: any, set: any
     reasoning: quick.reasoning, quip: quick.quip, tone: quick.tone,
     source: quick.source, analyzing: false,
     batchId,
+    emotion: quick.emotion,
+    emotionIntensity: quick.emotionIntensity,
+    reflection: quick.reflection,
+    bonusXp,
   };
 
   set((s: State) => {

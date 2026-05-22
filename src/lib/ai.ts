@@ -19,6 +19,12 @@ export type EntryAnalysis = {
   quip: string;            // short witty in-character reaction
   tone: ReactionTone;
   source: 'ai' | 'rules';
+  /** Detected from text or supplied via UI quick-pick. */
+  emotion?: string;
+  /** 1..3, optional. */
+  emotionIntensity?: number;
+  /** Reflection / thought / how it felt — extracted by AI from longer entries. */
+  reflection?: string;
 };
 
 const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';

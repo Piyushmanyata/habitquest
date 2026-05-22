@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useHabitStore } from '../store/useHabitStore';
 import { FREE_MODELS, getSelectedModelId, setSelectedModel } from '../lib/ai';
 import { loadVoices, speak, ttsAvailable } from '../lib/tts';
+import { getSfxVolume, setSfxVolume, sfxLevelUp } from '../lib/sfx';
 
 export default function Settings({ open, onClose }: { open: boolean; onClose: () => void }) {
   const apiKey = useHabitStore(s => s.apiKey);
@@ -17,6 +18,7 @@ export default function Settings({ open, onClose }: { open: boolean; onClose: ()
   const [model, setModel] = useState(getSelectedModelId());
   const [saved, setSaved] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [sfxVol, setSfxVol] = useState(getSfxVolume());
 
   useEffect(() => {
     if (!open) return;
@@ -173,6 +175,23 @@ export default function Settings({ open, onClose }: { open: boolean; onClose: ()
                 ) : (
                   <div className="text-[11px] text-[var(--muted-2)]">Voice not available in this browser.</div>
                 )}
+              </div>
+
+              <div className="mt-6 pt-5 border-t hairline">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs text-[var(--muted)]">Sound effects</label>
+                  <span className="mono text-[10px] text-[var(--muted-2)]">{Math.round(sfxVol * 100)}%</span>
+                </div>
+                <input
+                  type="range" min={0} max={1} step={0.05}
+                  value={sfxVol}
+                  onChange={e => { const v = parseFloat(e.target.value); setSfxVol(v); setSfxVolume(v); }}
+                  className="w-full accent-[var(--accent)]"
+                />
+                <div className="flex items-center justify-between mt-2">
+                  <button onClick={() => sfxLevelUp()} className="btn !py-1 !px-2.5 text-[11px]">Test fanfare</button>
+                  <span className="text-[10px] text-[var(--muted-2)]">Layered tones for XP, loot, level-ups, combos.</span>
+                </div>
               </div>
             </div>
           </motion.div>
