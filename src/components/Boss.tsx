@@ -19,21 +19,34 @@ export default function Boss() {
 
   const pct = Math.max(0, Math.min(1, boss.hpLeft / boss.maxHp));
   const dead = boss.defeated || boss.hpLeft <= 0;
+  const lowHp = !dead && pct < 0.25;
 
   return (
-    <div className="surface p-4">
+    <div className={`surface p-4 relative ${lowHp ? 'pulse-red' : ''}`}>
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-xs font-medium text-[var(--muted)] uppercase tracking-wider">Today’s Boss</h3>
         {dead ? (
           <span className="chip chip-pos mono">DEFEATED · +{boss.xpReward}</span>
         ) : (
-          <span className="mono text-[10px] text-[var(--muted-2)]">{boss.hpLeft}/{boss.maxHp} HP</span>
+          <span className={`mono text-[10px] ${lowHp ? 'text-[var(--neg)]' : 'text-[var(--muted-2)]'}`}>{boss.hpLeft}/{boss.maxHp} HP</span>
         )}
       </div>
       <div className="flex items-center gap-3">
         <motion.div
-          animate={hit ? { x: [0, -4, 4, -3, 3, 0], filter: ['none', 'brightness(1.6)', 'none'] } : { x: 0 }}
-          transition={{ duration: 0.32 }}
+          animate={
+            hit
+              ? { x: [0, -4, 4, -3, 3, 0], filter: ['none', 'brightness(1.6)', 'none'] }
+              : dead
+                ? { y: 0, rotate: 0 }
+                : { y: [0, -3, 0], rotate: lowHp ? [0, -2, 2, 0] : 0 }
+          }
+          transition={
+            hit
+              ? { duration: 0.32 }
+              : dead
+                ? {}
+                : { duration: lowHp ? 0.9 : 2.4, repeat: Infinity, ease: 'easeInOut' }
+          }
           className={`text-4xl ${dead ? 'grayscale opacity-40' : ''}`}
         >
           {dead ? <Skull className="w-10 h-10 text-[var(--muted-2)]" /> : boss.emoji}
@@ -43,7 +56,7 @@ export default function Boss() {
           <div className="text-[11px] text-[var(--muted)] italic">{boss.flavor}</div>
           <div className="mt-2 h-2 bg-[var(--line)] rounded-full overflow-hidden relative">
             <motion.div
-              className="h-full bg-gradient-to-r from-rose-500 via-orange-400 to-amber-300"
+              className={`h-full ${lowHp ? 'bg-gradient-to-r from-rose-600 via-rose-400 to-orange-300' : 'bg-gradient-to-r from-rose-500 via-orange-400 to-amber-300'}`}
               initial={{ width: '100%' }}
               animate={{ width: `${pct * 100}%` }}
               transition={{ type: 'spring', stiffness: 80, damping: 14 }}

@@ -136,8 +136,12 @@ export default function CoachChat() {
             {sending && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
                 <div className="px-3 py-2 rounded-xl bg-[var(--panel-2)] border hairline-2 flex items-center gap-2 text-[var(--muted)]">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span className="text-[12.5px]">Sage is thinking…</span>
+                  <span className="text-[11px] mono uppercase tracking-wider text-[var(--accent)]">sage</span>
+                  <span className="flex items-center">
+                    <span className="typing-dot" />
+                    <span className="typing-dot" />
+                    <span className="typing-dot" />
+                  </span>
                 </div>
               </motion.div>
             )}

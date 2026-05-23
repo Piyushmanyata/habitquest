@@ -1,5 +1,6 @@
 // Themed section wrapper with gradient border + ambient bg + eyebrow header.
 import { ReactNode } from 'react';
+import { motion } from 'framer-motion';
 
 export type SectionTheme = 'hero' | 'journal' | 'battle' | 'insight' | 'armory' | 'chat';
 
@@ -24,18 +25,31 @@ export default function Section({
   anchor?: string;
 }) {
   return (
-    <section id={id || anchor} className={`section section-${theme}`}>
+    <motion.section
+      id={id || anchor}
+      className={`section section-${theme}`}
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-80px' }}
+      transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+    >
       <div className="section-bg" />
       <div className="relative">
-        <div className="flex items-baseline justify-between gap-4 mb-4 flex-wrap">
+        <motion.div
+          className="flex items-baseline justify-between gap-4 mb-4 flex-wrap"
+          initial={{ opacity: 0, y: 8 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.45, delay: 0.1 }}
+        >
           <div>
             <div className={`section-eyebrow ${EYEBROW_COLOR[theme]}`}>{eyebrow}</div>
             <h2 className="section-title mt-1">{title}</h2>
           </div>
           {subtitle && <div className="text-[12px] text-[var(--muted)] max-w-md text-right">{subtitle}</div>}
-        </div>
+        </motion.div>
         {children}
       </div>
-    </section>
+    </motion.section>
   );
 }

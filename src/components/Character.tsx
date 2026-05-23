@@ -184,6 +184,12 @@ function SlotFig({
   const color = item ? RARITY_COLOR[item.rarity] : 'var(--line-2)';
   const glow  = item ? RARITY_GLOW[item.rarity]  : 'none';
   const equippedClass = item ? 'cursor-pointer' : 'opacity-40 cursor-default';
+  const shimmer =
+    item?.rarity === 'mythic'    ? 'shimmer-bg shimmer-bg-mythic' :
+    item?.rarity === 'legendary' ? 'shimmer-bg shimmer-bg-legend' :
+    item?.rarity === 'epic'      ? 'shimmer-bg shimmer-bg-epic'   :
+    item?.rarity === 'rare'      ? 'shimmer-bg shimmer-bg-rare'   :
+    '';
 
   return (
     <div className="absolute" style={style}>
@@ -206,7 +212,7 @@ function SlotFig({
           exit={{ scale: 0.8, opacity: 0 }}
           whileHover={item ? { scale: 1.08 } : undefined}
           whileTap={item ? { scale: 0.95 } : undefined}
-          className={`relative rounded-xl flex items-center justify-center border-2 group bg-[var(--panel-2)] ${equippedClass}`}
+          className={`relative rounded-xl flex items-center justify-center border-2 group bg-[var(--panel-2)] overflow-hidden ${equippedClass} ${big && item ? 'breathe' : ''}`}
           style={{
             width: size,
             height: size,
@@ -215,8 +221,10 @@ function SlotFig({
           }}
           title={item ? `${item.name} (click to unequip)` : `${SLOT_LABEL[slot]} (empty)`}
         >
+          {/* iridescent shimmer for rare+ */}
+          {shimmer && <div className={`absolute inset-0 rounded-xl ${shimmer}`} />}
           {/* gear emoji or empty placeholder */}
-          <span style={{ fontSize: big ? size * 0.65 : size * 0.6, lineHeight: 1 }}>
+          <span style={{ fontSize: big ? size * 0.65 : size * 0.6, lineHeight: 1, position: 'relative', zIndex: 1 }}>
             {item?.emoji ?? <span style={{ opacity: 0.25 }}>{SLOT_EMOJI[slot]}</span>}
           </span>
           {/* slot label, tiny */}

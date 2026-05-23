@@ -211,3 +211,64 @@ input:focus, textarea:focus, select:focus { outline: none; }
   letter-spacing: -0.025em;
   line-height: 1.1;
 }
+
+/* ──────── Animated decorations ──────── */
+
+/* Iridescent sweep used on legendary + mythic gear tiles. */
+@keyframes hq-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.shimmer-bg {
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    transparent 35%,
+    rgba(255,255,255,0.16) 50%,
+    transparent 65%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: hq-shimmer 3.2s linear infinite;
+  pointer-events: none;
+}
+.shimmer-bg-rare    { animation-duration: 3.6s; opacity: 0.55; }
+.shimmer-bg-epic    { animation-duration: 3.0s; opacity: 0.75; }
+.shimmer-bg-legend  { animation-duration: 2.6s; opacity: 0.9; }
+.shimmer-bg-mythic  { animation-duration: 2.0s; opacity: 1; }
+
+/* Soft slow pulse for living elements. */
+@keyframes hq-breathe {
+  0%, 100% { transform: scale(1) translateY(0); }
+  50%      { transform: scale(1.025) translateY(-2px); }
+}
+.breathe { animation: hq-breathe 4.2s ease-in-out infinite; }
+.breathe-slow { animation: hq-breathe 6s ease-in-out infinite; }
+
+/* Heartbeat pulse for low-HP elements. */
+@keyframes hq-pulse-red {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,107,107,0.0); }
+  50%      { box-shadow: 0 0 24px 6px rgba(255,107,107,0.45); }
+}
+.pulse-red { animation: hq-pulse-red 1.4s ease-in-out infinite; }
+
+/* Hover ripple — tiny scale + glow lift on cards */
+.card-hover:hover { transform: translateY(-2px); transition: transform 180ms ease; }
+
+/* Combo chromatic shift */
+@keyframes hq-combo-rgb {
+  0%   { filter: hue-rotate(0deg)   saturate(1.0); }
+  33%  { filter: hue-rotate(15deg)  saturate(1.2); }
+  66%  { filter: hue-rotate(-15deg) saturate(1.1); }
+  100% { filter: hue-rotate(0deg)   saturate(1.0); }
+}
+.combo-rgb { animation: hq-combo-rgb 1.6s linear infinite; }
+
+/* Sage typing dots */
+@keyframes hq-dot {
+  0%, 80%, 100% { transform: scale(0.5); opacity: 0.4; }
+  40%           { transform: scale(1);   opacity: 1; }
+}
+.typing-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin: 0 2px; animation: hq-dot 1.1s ease-in-out infinite; }
+.typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.typing-dot:nth-child(3) { animation-delay: 0.30s; }

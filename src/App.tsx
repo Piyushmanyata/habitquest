@@ -28,6 +28,8 @@ import StreakCalendar from './components/StreakCalendar';
 import CoachChat from './components/CoachChat';
 import MoodPanel from './components/MoodPanel';
 import BadgesPanel from './components/BadgesPanel';
+import AmbientParticles from './components/AmbientParticles';
+import FloatingNumbers from './components/FloatingNumbers';
 import Character from './components/Character';
 import Armory from './components/Armory';
 import Section from './components/Section';
@@ -187,12 +189,14 @@ export default function App() {
 
       <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <DailyRecap open={recapOpen} onClose={() => setRecapOpen(false)} />
+      <AmbientParticles />
       <ScreenFx />
       <XpToast />
       <LootToast />
       <LevelUpBanner />
       <AchievementReveal />
       <ComboCallout />
+      <FloatingNumbers />
     </div>
   );
 }

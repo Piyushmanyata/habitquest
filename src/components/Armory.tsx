@@ -151,11 +151,21 @@ function GearCard({ item, owned, equippedHere, level, gold, flash, onBuy, onEqui
     <motion.div
       animate={flash ? { scale: [1, 1.03, 1] } : {}}
       transition={{ duration: 0.5 }}
+      whileHover={{ y: -2 }}
       className="surface p-4 flex flex-col gap-2 relative overflow-hidden"
       style={{ borderColor: color, boxShadow: glow }}
     >
+      {/* Shimmer overlay for rare+ items */}
+      {(item.rarity === 'rare' || item.rarity === 'epic' || item.rarity === 'legendary' || item.rarity === 'mythic') && (
+        <div className={`absolute inset-0 rounded-[12px] pointer-events-none ${
+          item.rarity === 'mythic'    ? 'shimmer-bg shimmer-bg-mythic' :
+          item.rarity === 'legendary' ? 'shimmer-bg shimmer-bg-legend' :
+          item.rarity === 'epic'      ? 'shimmer-bg shimmer-bg-epic'   :
+                                        'shimmer-bg shimmer-bg-rare'
+        }`} />
+      )}
       {/* Rarity label corner */}
-      <div className="absolute top-0 right-0 px-2 py-0.5 text-[9px] mono uppercase tracking-wider rounded-bl"
+      <div className="absolute top-0 right-0 px-2 py-0.5 text-[9px] mono uppercase tracking-wider rounded-bl z-[1]"
            style={{ background: color, color: '#0a0a0b' }}>
         {item.rarity}
       </div>
