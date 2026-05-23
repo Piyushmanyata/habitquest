@@ -161,6 +161,12 @@ export default function MoodPanel() {
               })}
             </div>
           </div>
+
+          {/* Mood by hour-of-day */}
+          <MoodByHour entries={withMood} />
+
+          {/* Strongest mood + intensity readout */}
+          <MoodIntensity entries={withMood} />
         </>
       )}
 
@@ -196,4 +202,104 @@ function Kpi({ label, value, accent }: { label: string; value: React.ReactNode; 
       <div className={`mono text-xl mt-0.5 ${cls}`}>{value}</div>
     </div>
   );
+}
+
+// ── Mood by hour-of-day — 24 columns × 1 row (dominant emotion per hour) ──
+function MoodByHour({ entries }: { entries: any[] }) {
+  // For each hour, find the dominant emotion.
+  const byHour = useMemoOrSync(() => {
+    const buckets: Record<number, Record<string, number>> = {};
+    for (const e of entries) {
+      if (!e.emotion) continue;
+      const h = new Date(e.createdAt).getHours();
+      const b = buckets[h] ||= {};
+      b[e.emotion] = (b[e.emotion] || 0) + 1;
+    }
+    return Array.from({ length: 24 }, (_, h) => {
+      const b = buckets[h] || {};
+      let top = ''; let topC = 0; let total = 0;
+      for (const [k, v] of Object.entries(b)) { total += v; if (v > topC) { topC = v; top = k; } }
+      return { hour: h, top, count: total };
+    });
+  }, [entries]);
+
+  const max = Math.max(1, ...byHour.map(b => b.count));
+
+  return (
+    <div className="surface p-4">
+      <h3 className="text-xs font-medium text-[var(--muted)] uppercase tracking-wider mb-3">Mood by hour</h3>
+      <div className="flex items-end gap-[3px] h-20">
+        {byHour.map(b => {
+          const em = b.top ? EMOTION_BY_ID[b.top] : null;
+          const ratio = b.count / max;
+          const color = em
+            ? (em.valence === 'positive' ? 'var(--pos)' : em.valence === 'negative' ? 'var(--neg)' : 'var(--muted)')
+            : 'var(--line)';
+          return (
+            <div
+              key={b.hour}
+              className="flex-1 flex flex-col-reverse items-center gap-0.5"
+              title={em ? `${b.hour}:00 — ${em.label} (${b.count} entries)` : `${b.hour}:00 — no data`}
+            >
+              <div className="w-full rounded-t-sm" style={{ height: `${ratio * 100}%`, background: color, opacity: b.count ? 0.5 + ratio * 0.5 : 0.2 }} />
+              {em && b.count >= max * 0.4 && (
+                <span className="text-[9px] leading-none">{em.emoji}</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex justify-between text-[9px] mono text-[var(--muted-2)] mt-1">
+        <span>0</span><span>6</span><span>12</span><span>18</span><span>23</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Mood + intensity scatter — average intensity per emotion ──
+function MoodIntensity({ entries }: { entries: any[] }) {
+  const stats = Object.values(EMOTION_BY_ID).map(em => {
+    const xs = entries.filter(e => e.emotion === em.id);
+    if (xs.length === 0) return null;
+    const avg = xs.reduce((a, e) => a + (e.emotionIntensity || 1), 0) / xs.length;
+    return { em, avg, count: xs.length };
+  }).filter(Boolean) as { em: any; avg: number; count: number }[];
+
+  if (stats.length === 0) return null;
+
+  return (
+    <div className="surface p-4">
+      <h3 className="text-xs font-medium text-[var(--muted)] uppercase tracking-wider mb-3">Mood intensity</h3>
+      <div className="space-y-2">
+        {stats.sort((a, b) => b.count - a.count).map(s => (
+          <div key={s.em.id} className="flex items-center gap-2">
+            <span className="w-24 text-[12px] flex items-center gap-1.5">
+              <span>{s.em.emoji}</span>{s.em.label}
+            </span>
+            <div className="flex-1 flex gap-[2px]">
+              {[1, 2, 3].map(i => (
+                <div
+                  key={i}
+                  className="flex-1 h-2 rounded-sm"
+                  style={{
+                    background: i <= Math.round(s.avg)
+                      ? (s.em.valence === 'positive' ? 'var(--pos)' : s.em.valence === 'negative' ? 'var(--neg)' : 'var(--muted)')
+                      : 'var(--line)',
+                    opacity: i <= Math.round(s.avg) ? 0.5 + (i / 3) * 0.5 : 0.5,
+                  }}
+                />
+              ))}
+            </div>
+            <span className="mono text-[10px] text-[var(--muted-2)] w-14 text-right">avg {s.avg.toFixed(1)} · {s.count}×</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// tiny shim so the new subcomponents above can use useMemo without re-importing
+function useMemoOrSync<T>(factory: () => T, deps: any[]): T {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(factory, deps);
 }

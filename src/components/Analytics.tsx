@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useHabitStore, Entry } from '../store/useHabitStore';
+import { DeepInsights, StreakHistory } from './AnalyticsExtras';
 import { CATEGORIES, CAT_BY_ID } from '../lib/categories';
 import { dayKey } from '../lib/gamification';
 
@@ -238,7 +239,15 @@ export default function Analytics() {
         </Panel>
       </div>
 
-      {/* Keyword clouds */}
+      {/* Deep insights — best/worst day, intensity distribution, top slip */}
+      <DeepInsights entries={entries} byDay={byDay} days30={days30} />
+
+      {/* Streak history (last 30 days) */}
+      <Panel title="Streak history — last 30 days">
+        <StreakHistory days30={days30} byDay={byDay} />
+      </Panel>
+
+      {/* Keyword clouds — clickable to set the search filter on Logs (best-effort) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <Panel title="Top words in WINS">
           <WordCloud words={posWords} accent="pos" />

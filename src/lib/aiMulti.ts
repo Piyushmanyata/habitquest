@@ -145,13 +145,29 @@ SENTIMENT + XP:
   negative (cheap dopamine slip) xp = -(3 + intensity*4)  -> -7..-23  ← intentionally soft so users still log honestly
   neutral                        xp in -3..+3
 
-EMOTION (REQUIRED — pick one from this exact list, never invent new ones):
+EMOTION (REQUIRED — pick one from this exact list, never invent new ones).
+DEEPLY READ the user's words. Mood signals can be explicit ("felt proud", "anxious") or
+implicit (the verb/object they chose, sentence rhythm, regret words like "instead", celebration
+words like "finally"). Don't default to "neutral" — that's a cop-out unless the entry is truly
+flat. Pick the strongest emotion the words actually suggest.
+
   pleasant-high: joy, pride, energized, focused
   pleasant-low:  calm, gratitude
   unpleasant-high: anxious, frustrated
   unpleasant-low:  shame, lonely, tired
   neutral:       bored, neutral
-emotion_intensity: 1..3 (faint / clear / strong)
+
+emotion_intensity: 1 (faint hint) / 2 (clear) / 3 (strong, the whole entry centres on it).
+
+EMOTION HEURISTICS (when explicit feeling words are absent):
+  • "finally", "actually did it" → pride
+  • "couldn't help myself", "again", "instead of" → shame
+  • "rushed", "stressed", "panicked" → anxious
+  • "calm", "quiet", "in flow", "present" → calm
+  • "tired", "exhausted", "drained", "slept badly" → tired
+  • "alone", "missed", "haven't seen" → lonely
+  • "hyped", "stoked", "killed it", "crushed" → energized
+  • "deep work", "locked in", "in the zone" → focused
 
 REFLECTION (OPTIONAL):
   If the user wrote a thought, feeling, or self-observation alongside the action, EXTRACT it as a short reflection.

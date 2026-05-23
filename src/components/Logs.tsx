@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ChevronDown, ChevronRight, Filter, Trash2 } from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, Filter, Trash2, Maximize2, Minimize2, ArrowUpDown, X } from 'lucide-react';
 import { useHabitStore, Entry } from '../store/useHabitStore';
 import { CATEGORIES, CAT_BY_ID, findSub } from '../lib/categories';
 
@@ -117,7 +117,13 @@ export default function Logs() {
             className="flex-1 text-[13px] bg-transparent outline-none placeholder:text-[var(--muted-2)]"
           />
           {query && (
-            <button onClick={() => setQuery('')} className="text-[10px] mono text-[var(--muted-2)] hover:text-[var(--fg)]">clear</button>
+            <button
+              onClick={() => setQuery('')}
+              title="Clear search"
+              className="p-0.5 rounded text-[var(--muted-2)] hover:text-[var(--fg)] hover:bg-white/5"
+            >
+              <X className="w-3 h-3" />
+            </button>
           )}
         </div>
 
@@ -129,21 +135,35 @@ export default function Logs() {
           <FilterChip active={sent === 'neutral'}  onClick={() => setSent('neutral')}>neutral</FilterChip>
         </div>
 
-        <select value={sort} onChange={e => setSort(e.target.value as SortBy)}
-                className="text-[11px] mono px-2 py-1 rounded-md border hairline-2 bg-[var(--panel)]">
-          <option value="recent">recent first</option>
-          <option value="oldest">oldest first</option>
-          <option value="xp-desc">XP high → low</option>
-          <option value="xp-asc">XP low → high</option>
-          <option value="intensity">intensity</option>
-        </select>
+        <label className="flex items-center gap-1 text-[11px] mono text-[var(--muted-2)]" title="Sort">
+          <ArrowUpDown className="w-3 h-3" />
+          <select value={sort} onChange={e => setSort(e.target.value as SortBy)}
+                  className="px-2 py-1 rounded-md border hairline-2 bg-[var(--panel)]">
+            <option value="recent">recent</option>
+            <option value="oldest">oldest</option>
+            <option value="xp-desc">XP ↓</option>
+            <option value="xp-asc">XP ↑</option>
+            <option value="intensity">intensity</option>
+          </select>
+        </label>
 
         <div className="text-[10px] mono text-[var(--muted-2)] ml-auto">
           {totalFiltered} / {totalAll}
         </div>
-        <button onClick={expandAll} className="text-[10px] mono text-[var(--muted-2)] hover:text-[var(--fg)]">expand</button>
-        <span className="text-[var(--muted-2)]">·</span>
-        <button onClick={collapseAll} className="text-[10px] mono text-[var(--muted-2)] hover:text-[var(--fg)]">collapse</button>
+        <button
+          onClick={expandAll}
+          title="Expand all"
+          className="p-1 rounded text-[var(--muted-2)] hover:text-[var(--fg)] hover:bg-white/5 transition"
+        >
+          <Maximize2 className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={collapseAll}
+          title="Collapse all"
+          className="p-1 rounded text-[var(--muted-2)] hover:text-[var(--fg)] hover:bg-white/5 transition"
+        >
+          <Minimize2 className="w-3.5 h-3.5" />
+        </button>
       </div>
 
       {/* Categories */}

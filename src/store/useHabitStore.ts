@@ -45,10 +45,16 @@ export type Entry = {
   bonusXp?: number;        // honest-log + reflection + emotion bonuses (already included in xpDelta)
 };
 
-type Profile = { xp: number; gold: number; perfectDays: number; longestStreak: number; bossesDefeated: number };
+type Profile = {
+  xp: number; gold: number;
+  perfectDays: number; longestStreak: number; bossesDefeated: number;
+  hourlyStreak: number; hourlyBest: number;
+  /** ms epoch of the last hour-block in which the user logged anything */
+  lastHourlyTick: number;
+};
 type LastChange = { delta: number; at: number; sentiment: Entry['sentiment']; combo: number } | null;
 type LastLoot = { item: LootItem; at: number } | null;
-type BossState = { day: string; hpLeft: number; defeated: boolean; defeatedAt?: number };
+type BossState = { day: string; bossIndex: number; hpLeft: number; defeated: boolean; defeatedAt?: number };
 type Inventory = { focus: number; crit: number; freeze: number };
 type ActiveBuffs = { focus: boolean; crit: boolean };
 
@@ -98,7 +104,7 @@ type State = {
   unlockedBadges: () => string[];
   comboMultiplier: () => number;
   useItem: (kind: 'focus' | 'crit') => void;
-  todaysBoss: () => Boss & { hpLeft: number; defeated: boolean };
+  todaysBoss: () => Boss & { hpLeft: number; defeated: boolean; bossIndex: number };
 
   // shop + memory + check-in
   memory: () => UserMemory;
@@ -136,11 +142,23 @@ const COMBO_WINDOW_MS = 25 * 60 * 1000; // 25 min idle resets combo
 function ensureBoss(b: BossState | null): BossState & { name: string; emoji: string; flavor: string; maxHp: number; xpReward: number } {
   const today = dayKey();
   if (!b || b.day !== today) {
-    const def = bossForDay(today);
-    return { day: today, hpLeft: def.maxHp, defeated: false, name: def.name, emoji: def.emoji, flavor: def.flavor, maxHp: def.maxHp, xpReward: def.xpReward };
+    // New day -> fresh chain starting at boss #0.
+    const def = bossForDay(today, 0);
+    return { day: today, bossIndex: 0, hpLeft: def.maxHp, defeated: false,
+             name: def.name, emoji: def.emoji, flavor: def.flavor, maxHp: def.maxHp, xpReward: def.xpReward };
   }
-  const def = bossForDay(today);
-  return { ...b, name: def.name, emoji: def.emoji, flavor: def.flavor, maxHp: def.maxHp, xpReward: def.xpReward };
+  // Same day: regenerate definition from the index in state.
+  const def = bossForDay(today, b.bossIndex ?? 0);
+  return { ...b, bossIndex: b.bossIndex ?? 0,
+           name: def.name, emoji: def.emoji, flavor: def.flavor, maxHp: def.maxHp, xpReward: def.xpReward };
+}
+
+/** Spawn the NEXT boss in today's chain. Called immediately after a defeat. */
+function spawnNextBoss(prev: BossState): BossState & { name: string; emoji: string; flavor: string; maxHp: number; xpReward: number } {
+  const nextIndex = (prev.bossIndex ?? 0) + 1;
+  const def = bossForDay(prev.day, nextIndex);
+  return { day: prev.day, bossIndex: nextIndex, hpLeft: def.maxHp, defeated: false,
+           name: def.name, emoji: def.emoji, flavor: def.flavor, maxHp: def.maxHp, xpReward: def.xpReward };
 }
 
 function multiplierFor(combo: number) {
@@ -315,11 +333,35 @@ function applyOneEntry(quick: EntryAnalysis, batchId: string, get: any, set: any
     let finalXp = xp;
     // Gold accrues ONLY on positive sentiment (productive actions).
     let goldGain = entry.sentiment === 'positive' ? Math.max(0, entry.xpDelta) : 0;
+
+    // Hourly streak: every distinct calendar-hour block that has at least one
+    // entry continues the streak. Positives within a new hour earn +5 bonus gold.
+    const hourMs = 60 * 60 * 1000;
+    const currentHourBucket = Math.floor(Date.now() / hourMs);
+    const lastHourBucket = Math.floor((s.profile.lastHourlyTick || 0) / hourMs);
+    let hourlyStreak = s.profile.hourlyStreak;
+    let hourlyBest   = s.profile.hourlyBest;
+    let lastHourlyTick = s.profile.lastHourlyTick;
+    if (currentHourBucket > lastHourBucket) {
+      if (currentHourBucket - lastHourBucket === 1) {
+        hourlyStreak += 1;
+      } else if (lastHourBucket === 0) {
+        hourlyStreak = 1;
+      } else {
+        hourlyStreak = 1; // gap > 1 hour resets
+      }
+      hourlyBest = Math.max(hourlyBest, hourlyStreak);
+      lastHourlyTick = Date.now();
+      // Hourly-positive bonus (only the first positive in a fresh hour rewards gold).
+      if (entry.sentiment === 'positive') goldGain += 5;
+    }
     if (boss.defeated && (!s.boss || !s.boss.defeated)) {
       finalXp += boss.xpReward;
-      goldGain += Math.round(boss.xpReward * 0.5);  // boss defeat gives ~half its XP value in gold
+      goldGain += Math.round(boss.xpReward * 0.5);
       bossesDefeated += 1;
       trophy = { expiresAt: Date.now() + 24 * 60 * 60 * 1000 };
+      // Spawn the next boss in today's chain immediately — escalation continues.
+      boss = spawnNextBoss(boss);
     }
     // loot
     let lastLoot = s.lastLoot;
@@ -342,7 +384,7 @@ function applyOneEntry(quick: EntryAnalysis, batchId: string, get: any, set: any
     return rederive(
       {
         ...s, entries,
-        profile: { ...s.profile, xp: finalXp, gold: finalGold, bossesDefeated },
+        profile: { ...s.profile, xp: finalXp, gold: finalGold, bossesDefeated, hourlyStreak, hourlyBest, lastHourlyTick },
         combo, comboBest, comboExpiresAt, buffs, boss, trophy, inventory, lastLoot,
       },
       { delta: entry.xpDelta, sentiment: entry.sentiment, combo },
@@ -394,7 +436,11 @@ export const useHabitStore = create<State>()(
   persist(
     (set, get) => ({
       entries: [],
-      profile: { xp: 0, gold: 0, perfectDays: 0, longestStreak: 0, bossesDefeated: 0 },
+      profile: {
+        xp: 0, gold: 0,
+        perfectDays: 0, longestStreak: 0, bossesDefeated: 0,
+        hourlyStreak: 0, hourlyBest: 0, lastHourlyTick: 0,
+      },
       quests: [],
       questsDay: '',
       questsCompletedTotal: 0,
@@ -621,6 +667,16 @@ export const useHabitStore = create<State>()(
           questsCompletedTotal: s.questsCompletedTotal + 1,
           lastChange: { delta: q.xpReward, at: Date.now(), sentiment: 'positive', combo: s.combo },
         });
+        // Rolling stream: immediately spawn a fresh AI quest based on recent entries.
+        const recent = get().entries.slice(0, 6).map(e => ({ title: e.title, sentiment: e.sentiment, parentId: e.parentId }));
+        suggestQuestFromRecent(recent, dayKey()).then(nq => {
+          if (!nq) return;
+          set(st => {
+            // Replace the claimed quest with the new one (keep panel size stable).
+            const next = st.quests.map(x => x.id === id ? nq : x);
+            return { quests: next };
+          });
+        }).catch(() => {});
       },
 
       useItem(kind) {
@@ -634,7 +690,13 @@ export const useHabitStore = create<State>()(
 
       todaysBoss() {
         const b = ensureBoss(get().boss);
-        return { id: `boss-${b.day}`, name: b.name, emoji: b.emoji, flavor: b.flavor, maxHp: b.maxHp, xpReward: b.xpReward, hpLeft: b.hpLeft, defeated: b.defeated };
+        return {
+          id: `boss-${b.day}-${b.bossIndex}`,
+          name: b.name, emoji: b.emoji, flavor: b.flavor,
+          maxHp: b.maxHp, xpReward: b.xpReward,
+          hpLeft: b.hpLeft, defeated: b.defeated,
+          bossIndex: b.bossIndex,
+        };
       },
 
       memory() { return deriveMemory(get().entries); },
@@ -817,6 +879,12 @@ export const useHabitStore = create<State>()(
           questsCompletedTotal: s.questsCompletedTotal + 1,
           lastChange: { delta: q.xpReward, sentiment: 'positive', combo: s.combo, at: Date.now() },
         });
+        // Rolling stream: spawn next AI quest grounded in the latest entries.
+        const recent = get().entries.slice(0, 6).map(e => ({ title: e.title, sentiment: e.sentiment, parentId: e.parentId }));
+        suggestQuestFromRecent(recent, dayKey()).then(nq => {
+          if (!nq) return;
+          set(st => ({ quests: st.quests.map(x => x.id === questId ? nq : x) }));
+        }).catch(() => {});
       },
 
       // Multi-entry add — waits for AI, applies once. Heuristic only as fallback if AI returns nothing.
@@ -975,8 +1043,14 @@ export const useHabitStore = create<State>()(
       },
     }),
     {
-      name: 'habitquest-v12',
+      name: 'habitquest-v13',
       onRehydrateStorage: () => (s) => {
+        if (s && s.profile) {
+          // Backfill new profile fields safely on first load after schema bump.
+          if (typeof s.profile.hourlyStreak !== 'number') s.profile.hourlyStreak = 0;
+          if (typeof s.profile.hourlyBest   !== 'number') s.profile.hourlyBest = 0;
+          if (typeof s.profile.lastHourlyTick !== 'number') s.profile.lastHourlyTick = 0;
+        }
         if (s && s.profile && typeof s.profile.gold !== 'number') {
           // v11 -> v12 migration: seed gold from positive XP earned so users don't start broke.
           const positiveXp = s.entries

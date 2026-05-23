@@ -24,7 +24,14 @@ export default function Boss() {
   return (
     <div className={`surface p-4 relative ${lowHp ? 'pulse-red' : ''}`}>
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs font-medium text-[var(--muted)] uppercase tracking-wider">Today’s Boss</h3>
+        <h3 className="text-xs font-medium text-[var(--muted)] uppercase tracking-wider flex items-center gap-2">
+          Today's Boss
+          {boss.bossIndex > 0 && (
+            <span className="mono text-[9px] px-1.5 py-0.5 rounded bg-amber-300/15 text-amber-300 border border-amber-300/30">
+              wave {boss.bossIndex + 1}
+            </span>
+          )}
+        </h3>
         {dead ? (
           <span className="chip chip-pos mono">DEFEATED · +{boss.xpReward}</span>
         ) : (

@@ -1,5 +1,6 @@
-// Daily Boss: one themed boss per day. Positive entries deal damage.
-// Deterministic per day so the boss is consistent across reloads.
+// Daily Boss chain: defeat one and the next one spawns immediately. Bigger HP,
+// bigger reward each time. The chain is deterministic per (day, index) so a
+// reload won't shuffle the queue.
 
 export type Boss = {
   id: string;
@@ -10,15 +11,25 @@ export type Boss = {
   xpReward: number;
 };
 
-const ROSTER: Omit<Boss, 'id'>[] = [
-  { name: 'Procrastination Demon', emoji: '👹', flavor: 'whispers “tomorrow…”', maxHp: 80,  xpReward: 100 },
-  { name: 'Doom-Scroll Hydra',    emoji: '🐍', flavor: 'feeds on infinite feeds', maxHp: 90,  xpReward: 110 },
-  { name: 'Couch Goblin',         emoji: '🛋️', flavor: 'guards the remote', maxHp: 70,  xpReward: 90 },
-  { name: 'Sugar Witch',          emoji: '🍩', flavor: 'casts cravings at midnight', maxHp: 75, xpReward: 95 },
-  { name: 'Anxiety Wraith',       emoji: '🌀', flavor: 'spins thought-loops', maxHp: 85,  xpReward: 105 },
-  { name: 'Snooze Kraken',        emoji: '😴', flavor: 'drags you back under', maxHp: 80, xpReward: 100 },
-  { name: 'Notification Imp',     emoji: '🔔', flavor: 'pings you to death', maxHp: 65, xpReward: 85 },
+const ROSTER: Omit<Boss, 'id' | 'maxHp' | 'xpReward'>[] = [
+  { name: 'Procrastination Demon', emoji: '👹', flavor: 'whispers "tomorrow…"' },
+  { name: 'Doom-Scroll Hydra',     emoji: '🐍', flavor: 'feeds on infinite feeds' },
+  { name: 'Couch Goblin',          emoji: '🛋️', flavor: 'guards the remote' },
+  { name: 'Sugar Witch',           emoji: '🍩', flavor: 'casts cravings at midnight' },
+  { name: 'Anxiety Wraith',        emoji: '🌀', flavor: 'spins thought-loops' },
+  { name: 'Snooze Kraken',         emoji: '😴', flavor: 'drags you back under' },
+  { name: 'Notification Imp',      emoji: '🔔', flavor: 'pings you to death' },
+  { name: 'Comparison Specter',    emoji: '👻', flavor: 'shows you everyone else first' },
+  { name: 'Excuse Goblin',         emoji: '🧌', flavor: 'has a reason for everything' },
+  { name: 'Numbness Vortex',       emoji: '🕳️', flavor: 'eats the urge to start' },
+  { name: 'Phone Phantom',         emoji: '📱', flavor: 'glows in the dark' },
+  { name: 'Tomorrow Troll',        emoji: '🌙', flavor: 'promises a fresh start, forever' },
 ];
+
+const BASE_HP = 80;
+const BASE_REWARD = 100;
+// Each boss after the first is +30% HP, +30% reward.
+const ESCALATION = 1.30;
 
 function hash(s: string) {
   let h = 0;
@@ -26,10 +37,17 @@ function hash(s: string) {
   return Math.abs(h);
 }
 
-export function bossForDay(dayKey: string): Boss {
-  const idx = hash(dayKey) % ROSTER.length;
+export function bossForDay(dayKey: string, bossIndex: number = 0): Boss {
+  // Rotate through the roster deterministically per (day, index).
+  const seed = hash(dayKey + ':' + bossIndex);
+  const idx = seed % ROSTER.length;
   const b = ROSTER[idx];
-  return { id: `boss-${dayKey}`, ...b };
+
+  const tier = Math.pow(ESCALATION, bossIndex);
+  const maxHp     = Math.round(BASE_HP * tier);
+  const xpReward  = Math.round(BASE_REWARD * tier);
+
+  return { id: `boss-${dayKey}-${bossIndex}`, ...b, maxHp, xpReward };
 }
 
 /** Damage a positive entry deals = base 12 × intensity factor × multiplier. */

@@ -9,6 +9,7 @@ import AnimatedNumber from './AnimatedNumber';
 export default function TopBar({ onOpenSettings, onOpenRecap }: { onOpenSettings: () => void; onOpenRecap: () => void }) {
   const xp = useHabitStore(s => s.profile.xp);
   const gold = useHabitStore(s => s.profile.gold);
+  const hourly = useHabitStore(s => s.profile.hourlyStreak);
   const streak = useHabitStore(s => s.currentStreak());
   const todayNet = useHabitStore(s => s.todayNetXp());
   const lvl = levelFromXp(xp);
@@ -26,6 +27,7 @@ export default function TopBar({ onOpenSettings, onOpenRecap }: { onOpenSettings
 
       <div className="flex items-center gap-5">
         <Stat label="streak" value={`${streak}d`} />
+        <Stat label="hourly" value={`${hourly}h`} accent={hourly >= 3 ? 'pos' : undefined} />
         <Stat label="level" value={<AnimatedNumber value={lvl.level} />} />
         <div className="flex items-baseline gap-1.5" title="Gold — spend in Shop and Armory">
           <Coins className="w-3.5 h-3.5 text-amber-300 self-center" />

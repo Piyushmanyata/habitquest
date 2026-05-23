@@ -19,10 +19,28 @@ export default function ScreenFx() {
     const isNeg = last.sentiment === 'negative' || last.delta < 0;
     if (isPos) {
       setFlash('pos');
-      const burst = Math.min(220, 60 + Math.abs(last.delta) * 3 + last.combo * 15);
-      confetti({ particleCount: burst, spread: 75, startVelocity: 40, scalar: 0.9,
-        colors: ['#c2f54a', '#ffffff', '#9be700', '#e6ffb3'], origin: { y: 0.18 } });
-      if (last.combo >= 3) setTimeout(() => confetti({ particleCount: 120, spread: 140, origin: { y: 0.4 } }), 120);
+      const limeColors  = ['#c2f54a', '#ffffff', '#9be700', '#e6ffb3'];
+      const mythicMix   = ['#c2f54a', '#7dd3fc', '#a855f7', '#ffd43b', '#ffffff'];
+      const palette = last.combo >= 5 ? mythicMix : limeColors;
+
+      // Main fountain from top.
+      const main = Math.min(280, 70 + Math.abs(last.delta) * 3.5 + last.combo * 18);
+      confetti({ particleCount: main, spread: 85, startVelocity: 45, scalar: 1.05,
+        ticks: 220, gravity: 0.95, colors: palette, origin: { y: 0.15 } });
+
+      // Side cannons for combo 3+ (left and right).
+      if (last.combo >= 3) {
+        setTimeout(() => confetti({ particleCount: 80, angle: 60,  spread: 60, startVelocity: 55, origin: { x: 0, y: 0.7 }, colors: palette }), 80);
+        setTimeout(() => confetti({ particleCount: 80, angle: 120, spread: 60, startVelocity: 55, origin: { x: 1, y: 0.7 }, colors: palette }), 80);
+      }
+      // Heavy fountain finale for combo 5+ (the "MEGA" feel).
+      if (last.combo >= 5) {
+        setTimeout(() => confetti({ particleCount: 160, spread: 160, startVelocity: 55, scalar: 1.2, ticks: 280, colors: palette, origin: { y: 0.4 } }), 240);
+      }
+      // Star burst for combo 7+ (GODLIKE).
+      if (last.combo >= 7) {
+        setTimeout(() => confetti({ particleCount: 220, spread: 360, startVelocity: 35, scalar: 1.4, ticks: 320, shapes: ['star' as any], colors: ['#fbbf24', '#a855f7', '#ffffff'], origin: { y: 0.5 } }), 400);
+      }
       sfxPositive(Math.max(1, Math.min(5, Math.abs(last.delta) / 10)));
     } else if (isNeg) {
       setFlash('neg');
@@ -41,9 +59,13 @@ export default function ScreenFx() {
   useEffect(() => {
     if (bossesDefeated > prevBosses.current) {
       sfxBossDefeat();
-      confetti({ particleCount: 250, spread: 140, startVelocity: 55,
-        colors: ['#ff6b6b', '#ffa94d', '#ffd43b', '#ffffff'], origin: { y: 0.35 } });
-      setTimeout(() => confetti({ particleCount: 100, spread: 100, origin: { y: 0.5 } }), 250);
+      // Triple-stage boss defeat — fountain, cross-cannons, star burst.
+      const heroic = ['#ff6b6b', '#ffa94d', '#ffd43b', '#ffffff', '#c2f54a'];
+      confetti({ particleCount: 320, spread: 150, startVelocity: 60, scalar: 1.15, ticks: 260,
+                 colors: heroic, origin: { y: 0.3 } });
+      setTimeout(() => confetti({ particleCount: 140, angle: 60,  spread: 75, startVelocity: 65, origin: { x: 0, y: 0.65 }, colors: heroic }), 180);
+      setTimeout(() => confetti({ particleCount: 140, angle: 120, spread: 75, startVelocity: 65, origin: { x: 1, y: 0.65 }, colors: heroic }), 180);
+      setTimeout(() => confetti({ particleCount: 220, spread: 360, startVelocity: 30, scalar: 1.5, ticks: 300, shapes: ['star' as any], colors: ['#fbbf24', '#ffd43b', '#ffffff'], origin: { y: 0.5 } }), 480);
     }
     prevBosses.current = bossesDefeated;
   }, [bossesDefeated]);
