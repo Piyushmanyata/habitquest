@@ -27,6 +27,7 @@ import Logs from './components/Logs';
 import StreakCalendar from './components/StreakCalendar';
 import CoachChat from './components/CoachChat';
 import MoodPanel from './components/MoodPanel';
+import BadgesPanel from './components/BadgesPanel';
 import Character from './components/Character';
 import Armory from './components/Armory';
 import Section from './components/Section';
@@ -146,13 +147,16 @@ export default function App() {
           {/* ═══ INSIGHT ═══ */}
           <Section
             id="insight" theme="insight"
-            eyebrow="04 · what sage sees" title="Memory, Wisdom & Stats"
-            subtitle="The patterns Sage has learned about you and the achievements you've banked."
+            eyebrow="04 · what sage sees" title="Memory, Wisdom & Badges"
+            subtitle="The patterns Sage has learned about you and every badge you've banked."
           >
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <MemoryCard />
               <WisdomPanel />
               <Stats />
+            </div>
+            <div className="mt-4">
+              <BadgesPanel />
             </div>
           </Section>
 

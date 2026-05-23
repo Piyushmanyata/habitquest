@@ -45,7 +45,7 @@ export type Entry = {
   bonusXp?: number;        // honest-log + reflection + emotion bonuses (already included in xpDelta)
 };
 
-type Profile = { xp: number; perfectDays: number; longestStreak: number; bossesDefeated: number };
+type Profile = { xp: number; gold: number; perfectDays: number; longestStreak: number; bossesDefeated: number };
 type LastChange = { delta: number; at: number; sentiment: Entry['sentiment']; combo: number } | null;
 type LastLoot = { item: LootItem; at: number } | null;
 type BossState = { day: string; hpLeft: number; defeated: boolean; defeatedAt?: number };
@@ -313,8 +313,11 @@ function applyOneEntry(quick: EntryAnalysis, batchId: string, get: any, set: any
       }
     }
     let finalXp = xp;
+    // Gold accrues ONLY on positive sentiment (productive actions).
+    let goldGain = entry.sentiment === 'positive' ? Math.max(0, entry.xpDelta) : 0;
     if (boss.defeated && (!s.boss || !s.boss.defeated)) {
       finalXp += boss.xpReward;
+      goldGain += Math.round(boss.xpReward * 0.5);  // boss defeat gives ~half its XP value in gold
       bossesDefeated += 1;
       trophy = { expiresAt: Date.now() + 24 * 60 * 60 * 1000 };
     }
@@ -326,19 +329,20 @@ function applyOneEntry(quick: EntryAnalysis, batchId: string, get: any, set: any
       if (drop) {
         lastLoot = { item: drop, at: Date.now() };
         switch (drop.kind) {
-          case 'xp_boost_small': finalXp += 10; break;
-          case 'xp_boost_big':   finalXp += 25; break;
+          case 'xp_boost_small': finalXp += 10; goldGain += 8; break;
+          case 'xp_boost_big':   finalXp += 25; goldGain += 20; break;
           case 'focus_token':    inventory = { ...inventory, focus: inventory.focus + 1 }; break;
           case 'crit_strike':    inventory = { ...inventory, crit: inventory.crit + 1 }; break;
           case 'streak_freeze':  inventory = { ...inventory, freeze: inventory.freeze + 1 }; break;
         }
       }
     }
+    const finalGold = s.profile.gold + goldGain;
     const prevBadgeIds = new Set(BADGES.filter(b => b.earned(badgeCtxFor(s))).map(b => b.id));
     return rederive(
       {
         ...s, entries,
-        profile: { ...s.profile, xp: finalXp, bossesDefeated },
+        profile: { ...s.profile, xp: finalXp, gold: finalGold, bossesDefeated },
         combo, comboBest, comboExpiresAt, buffs, boss, trophy, inventory, lastLoot,
       },
       { delta: entry.xpDelta, sentiment: entry.sentiment, combo },
@@ -390,7 +394,7 @@ export const useHabitStore = create<State>()(
   persist(
     (set, get) => ({
       entries: [],
-      profile: { xp: 0, perfectDays: 0, longestStreak: 0, bossesDefeated: 0 },
+      profile: { xp: 0, gold: 0, perfectDays: 0, longestStreak: 0, bossesDefeated: 0 },
       quests: [],
       questsDay: '',
       questsCompletedTotal: 0,
@@ -610,8 +614,9 @@ export const useHabitStore = create<State>()(
         const s = get();
         const q = s.quests.find(q => q.id === id);
         if (!q || !q.completed || q.claimed) return;
+        const goldReward = Math.round(q.xpReward * 0.7);
         set({
-          profile: { ...s.profile, xp: s.profile.xp + q.xpReward },
+          profile: { ...s.profile, xp: s.profile.xp + q.xpReward, gold: s.profile.gold + goldReward },
           quests: s.quests.map(x => x.id === id ? { ...x, claimed: true } : x),
           questsCompletedTotal: s.questsCompletedTotal + 1,
           lastChange: { delta: q.xpReward, at: Date.now(), sentiment: 'positive', combo: s.combo },
@@ -675,16 +680,17 @@ export const useHabitStore = create<State>()(
         if (!c || c.claimed) return;
         const today = dayKey();
         if (c.day !== today) return;
-        // Wager payout if there's an unresolved wager from today
         let xpAdd = c.xpReward;
+        let goldAdd = Math.round(c.xpReward * 0.7);
         let wager = s.wager;
         if (wager && wager.day === today && wager.resolved === null) {
-          xpAdd += wager.amount * 2; // double-or-nothing returns 2x stake
+          // Wager pays out 2x stake in gold (stake was already deducted).
+          goldAdd += wager.amount * 2;
           wager = { ...wager, resolved: 'win' };
         }
         set({
           aiChallenge: { ...c, claimed: true, completedAt: Date.now() },
-          profile: { ...s.profile, xp: s.profile.xp + xpAdd },
+          profile: { ...s.profile, xp: s.profile.xp + xpAdd, gold: s.profile.gold + goldAdd },
           lastChange: { delta: xpAdd, sentiment: 'positive', combo: s.combo, at: Date.now() },
           wager,
         });
@@ -695,9 +701,9 @@ export const useHabitStore = create<State>()(
         if (!s.aiChallenge || s.aiChallenge.claimed) return { ok: false, reason: 'no active challenge' };
         if (s.wager && s.wager.day === s.aiChallenge.day) return { ok: false, reason: 'already wagered today' };
         const amt = Math.max(10, Math.min(200, Math.round(amount)));
-        if (s.profile.xp < amt) return { ok: false, reason: 'not enough XP' };
+        if (s.profile.gold < amt) return { ok: false, reason: 'not enough gold' };
         set({
-          profile: { ...s.profile, xp: s.profile.xp - amt },
+          profile: { ...s.profile, gold: s.profile.gold - amt },
           wager: { day: s.aiChallenge.day, amount: amt, resolved: null },
         });
         return { ok: true };
@@ -744,11 +750,11 @@ export const useHabitStore = create<State>()(
         if (item.unlockLevel && lvl < item.unlockLevel) {
           return { ok: false, reason: `Requires level ${item.unlockLevel}` };
         }
-        if (s.profile.xp < item.cost) {
-          return { ok: false, reason: `Need ${item.cost - s.profile.xp} more XP` };
+        if (s.profile.gold < item.cost) {
+          return { ok: false, reason: `Need ${item.cost - s.profile.gold} more gold` };
         }
         set({
-          profile: { ...s.profile, xp: s.profile.xp - item.cost },
+          profile: { ...s.profile, gold: s.profile.gold - item.cost },
           gearOwned: [...s.gearOwned, id],
           // auto-equip if slot is empty
           gearEquipped: s.gearEquipped[item.slot] ? s.gearEquipped : { ...s.gearEquipped, [item.slot]: id },
@@ -804,9 +810,9 @@ export const useHabitStore = create<State>()(
         const s = get();
         const q = s.quests.find(q => q.id === questId);
         if (!q || q.claimed) return;
-        const newXp = s.profile.xp + q.xpReward;
+        const goldReward = Math.round(q.xpReward * 0.7);
         set({
-          profile: { ...s.profile, xp: newXp },
+          profile: { ...s.profile, xp: s.profile.xp + q.xpReward, gold: s.profile.gold + goldReward },
           quests: s.quests.map(x => x.id === questId ? { ...x, completed: true, progress: x.target, claimed: true } : x),
           questsCompletedTotal: s.questsCompletedTotal + 1,
           lastChange: { delta: q.xpReward, sentiment: 'positive', combo: s.combo, at: Date.now() },
@@ -881,17 +887,17 @@ export const useHabitStore = create<State>()(
         const s = get();
         const item = ITEM_BY_ID[itemId] || s.customItems.find(i => i.id === itemId);
         if (!item) return { ok: false, reason: 'unknown item' };
-        if (s.profile.xp < item.cost) return { ok: false, reason: 'need ' + (item.cost - s.profile.xp) + ' more XP' };
-        const xp = s.profile.xp - item.cost;
+        if (s.profile.gold < item.cost) return { ok: false, reason: 'need ' + (item.cost - s.profile.gold) + ' more gold' };
+        const gold = s.profile.gold - item.cost;
         if (item.kind === 'pass') {
           set({
-            profile: { ...s.profile, xp },
+            profile: { ...s.profile, gold },
             passes: { ...s.passes, [item.id]: (s.passes[item.id] || 0) + 1 },
             lastPurchase: { itemId, at: Date.now() },
           });
         } else if (item.kind === 'powerup' && item.powerup) {
           set({
-            profile: { ...s.profile, xp },
+            profile: { ...s.profile, gold },
             inventory: { ...s.inventory, [item.powerup]: (s.inventory[item.powerup] as number) + 1 },
             lastPurchase: { itemId, at: Date.now() },
           });
@@ -938,8 +944,9 @@ export const useHabitStore = create<State>()(
         const s = get();
         if (s.lastCheckinDay === today) return 0;
         const bonus = 25;
+        const goldBonus = 15;
         set({
-          profile: { ...s.profile, xp: s.profile.xp + bonus },
+          profile: { ...s.profile, xp: s.profile.xp + bonus, gold: s.profile.gold + goldBonus },
           lastCheckinDay: today,
           lastChange: { delta: bonus, sentiment: 'positive', combo: s.combo, at: Date.now() },
         });
@@ -968,8 +975,15 @@ export const useHabitStore = create<State>()(
       },
     }),
     {
-      name: 'habitquest-v11',
+      name: 'habitquest-v12',
       onRehydrateStorage: () => (s) => {
+        if (s && s.profile && typeof s.profile.gold !== 'number') {
+          // v11 -> v12 migration: seed gold from positive XP earned so users don't start broke.
+          const positiveXp = s.entries
+            ? s.entries.filter(e => e.sentiment === 'positive').reduce((a, e) => a + Math.max(0, e.xpDelta), 0)
+            : Math.max(0, s.profile.xp);
+          s.profile.gold = positiveXp;
+        }
         if (s && !s.apiKey) {
           const fromLs =
             localStorage.getItem('hq-openrouter-key') ||

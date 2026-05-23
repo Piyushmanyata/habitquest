@@ -270,7 +270,7 @@ async function callWithFallback(system: string, user: string): Promise<any | nul
             { role: 'system', content: system },
             { role: 'user', content: user },
           ],
-          temperature: 0.9, max_tokens: 800,
+          temperature: 0.85, max_tokens: 500,
           response_format: { type: 'json_object' },
         }),
       });

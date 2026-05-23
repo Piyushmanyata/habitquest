@@ -48,6 +48,10 @@ export type Badge = {
   description: string;
   /** returns true if the user has earned this badge */
   earned: (ctx: BadgeCtx) => boolean;
+  /** returns progress 0..1 toward earning it */
+  progress?: (ctx: BadgeCtx) => number;
+  /** human-readable progress like "8 / 10 completions" */
+  progressLabel?: (ctx: BadgeCtx) => string;
 };
 
 export type BadgeCtx = {
@@ -59,19 +63,90 @@ export type BadgeCtx = {
   perfectDays: number;
 };
 
+function pct(n: number, max: number) { return Math.min(1, n / max); }
+function ratioLabel(now: number, max: number, unit: string) { return `${Math.min(now, max)} / ${max} ${unit}`; }
+
 export const BADGES: Badge[] = [
-  { id: 'first',     name: 'First Step',      emoji: '👣', description: 'Complete your first habit',     earned: c => c.totalCompletions >= 1 },
-  { id: 'ten',       name: 'Getting Going',   emoji: '🔟', description: 'Complete 10 habits',            earned: c => c.totalCompletions >= 10 },
-  { id: 'fifty',     name: 'Half Century',    emoji: '🏅', description: 'Complete 50 habits',            earned: c => c.totalCompletions >= 50 },
-  { id: 'hundo',     name: 'Centurion',       emoji: '💯', description: 'Complete 100 habits',           earned: c => c.totalCompletions >= 100 },
-  { id: 's3',        name: 'On A Roll',       emoji: '🔥', description: '3-day streak',                  earned: c => c.longestStreak >= 3 },
-  { id: 's7',        name: 'Week Warrior',    emoji: '⚔️', description: '7-day streak',                  earned: c => c.longestStreak >= 7 },
-  { id: 's30',       name: 'Unbreakable',     emoji: '🛡️', description: '30-day streak',                 earned: c => c.longestStreak >= 30 },
-  { id: 'lvl5',      name: 'Rising Hero',     emoji: '⭐', description: 'Reach level 5',                  earned: c => c.level >= 5 },
-  { id: 'lvl10',     name: 'Veteran',         emoji: '🌟', description: 'Reach level 10',                 earned: c => c.level >= 10 },
-  { id: 'diverse',   name: 'Renaissance',     emoji: '🎭', description: 'Cover 4 different categories',  earned: c => c.uniqueCategories >= 4 },
-  { id: 'q5',        name: 'Questmaster',     emoji: '📜', description: 'Finish 5 daily quests',         earned: c => c.questsCompleted >= 5 },
-  { id: 'perfect3',  name: 'Triple Perfect',  emoji: '💎', description: '3 perfect days',                earned: c => c.perfectDays >= 3 },
+  { id: 'first',     name: 'First Step',      emoji: '👣', description: 'Log your first positive entry.',
+    earned: c => c.totalCompletions >= 1,
+    progress: c => pct(c.totalCompletions, 1),
+    progressLabel: c => ratioLabel(c.totalCompletions, 1, 'positives') },
+  { id: 'ten',       name: 'Getting Going',   emoji: '🔟', description: 'Log 10 positive entries.',
+    earned: c => c.totalCompletions >= 10,
+    progress: c => pct(c.totalCompletions, 10),
+    progressLabel: c => ratioLabel(c.totalCompletions, 10, 'positives') },
+  { id: 'fifty',     name: 'Half Century',    emoji: '🏅', description: 'Log 50 positive entries.',
+    earned: c => c.totalCompletions >= 50,
+    progress: c => pct(c.totalCompletions, 50),
+    progressLabel: c => ratioLabel(c.totalCompletions, 50, 'positives') },
+  { id: 'hundo',     name: 'Centurion',       emoji: '💯', description: 'Log 100 positive entries.',
+    earned: c => c.totalCompletions >= 100,
+    progress: c => pct(c.totalCompletions, 100),
+    progressLabel: c => ratioLabel(c.totalCompletions, 100, 'positives') },
+  { id: 'fivehundred', name: 'Five Hundred',  emoji: '🎯', description: 'Log 500 positive entries — masterclass.',
+    earned: c => c.totalCompletions >= 500,
+    progress: c => pct(c.totalCompletions, 500),
+    progressLabel: c => ratioLabel(c.totalCompletions, 500, 'positives') },
+  { id: 's3',        name: 'On A Roll',       emoji: '🔥', description: 'Hit a 3-day streak.',
+    earned: c => c.longestStreak >= 3,
+    progress: c => pct(c.longestStreak, 3),
+    progressLabel: c => ratioLabel(c.longestStreak, 3, 'days') },
+  { id: 's7',        name: 'Week Warrior',    emoji: '⚔️', description: 'Hit a 7-day streak.',
+    earned: c => c.longestStreak >= 7,
+    progress: c => pct(c.longestStreak, 7),
+    progressLabel: c => ratioLabel(c.longestStreak, 7, 'days') },
+  { id: 's14',       name: 'Fortnight Force', emoji: '🌗', description: 'Hit a 14-day streak.',
+    earned: c => c.longestStreak >= 14,
+    progress: c => pct(c.longestStreak, 14),
+    progressLabel: c => ratioLabel(c.longestStreak, 14, 'days') },
+  { id: 's30',       name: 'Unbreakable',     emoji: '🛡️', description: '30-day streak — unbreakable.',
+    earned: c => c.longestStreak >= 30,
+    progress: c => pct(c.longestStreak, 30),
+    progressLabel: c => ratioLabel(c.longestStreak, 30, 'days') },
+  { id: 's100',      name: 'Centennial Soul', emoji: '🌌', description: '100-day streak — mythic.',
+    earned: c => c.longestStreak >= 100,
+    progress: c => pct(c.longestStreak, 100),
+    progressLabel: c => ratioLabel(c.longestStreak, 100, 'days') },
+  { id: 'lvl5',      name: 'Rising Hero',     emoji: '⭐', description: 'Reach level 5.',
+    earned: c => c.level >= 5,
+    progress: c => pct(c.level, 5),
+    progressLabel: c => ratioLabel(c.level, 5, 'lvl') },
+  { id: 'lvl10',     name: 'Veteran',         emoji: '🌟', description: 'Reach level 10.',
+    earned: c => c.level >= 10,
+    progress: c => pct(c.level, 10),
+    progressLabel: c => ratioLabel(c.level, 10, 'lvl') },
+  { id: 'lvl20',     name: 'Champion',        emoji: '👑', description: 'Reach level 20.',
+    earned: c => c.level >= 20,
+    progress: c => pct(c.level, 20),
+    progressLabel: c => ratioLabel(c.level, 20, 'lvl') },
+  { id: 'lvl30',     name: 'Mythic',          emoji: '🪐', description: 'Reach level 30 — top tier.',
+    earned: c => c.level >= 30,
+    progress: c => pct(c.level, 30),
+    progressLabel: c => ratioLabel(c.level, 30, 'lvl') },
+  { id: 'diverse',   name: 'Renaissance',     emoji: '🎭', description: 'Log in 4 different categories.',
+    earned: c => c.uniqueCategories >= 4,
+    progress: c => pct(c.uniqueCategories, 4),
+    progressLabel: c => ratioLabel(c.uniqueCategories, 4, 'cats') },
+  { id: 'allcats',   name: 'Renaissance Lord',emoji: '🌐', description: 'Log in all 7 categories at least once.',
+    earned: c => c.uniqueCategories >= 7,
+    progress: c => pct(c.uniqueCategories, 7),
+    progressLabel: c => ratioLabel(c.uniqueCategories, 7, 'cats') },
+  { id: 'q5',        name: 'Questmaster',     emoji: '📜', description: 'Finish 5 daily quests.',
+    earned: c => c.questsCompleted >= 5,
+    progress: c => pct(c.questsCompleted, 5),
+    progressLabel: c => ratioLabel(c.questsCompleted, 5, 'quests') },
+  { id: 'q25',       name: 'Quest King',      emoji: '👑', description: 'Finish 25 daily quests.',
+    earned: c => c.questsCompleted >= 25,
+    progress: c => pct(c.questsCompleted, 25),
+    progressLabel: c => ratioLabel(c.questsCompleted, 25, 'quests') },
+  { id: 'perfect3',  name: 'Triple Perfect',  emoji: '💎', description: '3 perfect days (3+ positives, 0 slips).',
+    earned: c => c.perfectDays >= 3,
+    progress: c => pct(c.perfectDays, 3),
+    progressLabel: c => ratioLabel(c.perfectDays, 3, 'perfect') },
+  { id: 'perfect14', name: 'Spotless Two-Wk', emoji: '✨', description: '14 perfect days.',
+    earned: c => c.perfectDays >= 14,
+    progress: c => pct(c.perfectDays, 14),
+    progressLabel: c => ratioLabel(c.perfectDays, 14, 'perfect') },
 ];
 
 // ----- Daily quests -----

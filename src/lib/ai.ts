@@ -31,16 +31,20 @@ const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const DEEPSEEK_MODEL = 'deepseek-chat';
 
-// Curated list of *totally free* OpenRouter models (all end with :free).
+// Curated list of *totally free* OpenRouter models, sorted FASTEST FIRST.
 // Live IDs verified via /api/v1/models — update if upstream renames.
+// Speed tier roughly: 1.2B < 3B < 24B < 70B+. Models with MoE (A3B etc.) are fast
+// despite the large total because only a few experts activate per token.
 export const FREE_MODELS: { id: string; label: string; note: string }[] = [
-  { id: 'deepseek/deepseek-v4-flash:free',              label: 'DeepSeek V4 Flash',   note: 'Snappy + smart (default)' },
-  { id: 'openai/gpt-oss-120b:free',                     label: 'GPT-OSS 120B',        note: 'OpenAI open-source flagship' },
-  { id: 'meta-llama/llama-3.3-70b-instruct:free',       label: 'Llama 3.3 70B',       note: 'Solid Meta open-source' },
-  { id: 'qwen/qwen3-next-80b-a3b-instruct:free',        label: 'Qwen 3 Next 80B',     note: 'Great at structured output' },
-  { id: 'nvidia/nemotron-3-super-120b-a12b:free',       label: 'Nemotron 3 120B',     note: 'NVIDIA reasoning' },
-  { id: 'google/gemma-4-31b-it:free',                   label: 'Gemma 4 31B',         note: 'Google open-source' },
-  { id: 'z-ai/glm-4.5-air:free',                        label: 'GLM 4.5 Air',         note: 'Lightweight' },
+  { id: 'mistralai/mistral-small-3.1-24b-instruct:free',label: 'Mistral Small 3.1',   note: 'Fast + reliable JSON (default)' },
+  { id: 'meta-llama/llama-3.2-3b-instruct:free',        label: 'Llama 3.2 3B',        note: 'Very fast, tiny' },
+  { id: 'liquid/lfm-2.5-1.2b-instruct:free',            label: 'Liquid 2.5 1.2B',     note: 'Fastest (sub-second)' },
+  { id: 'qwen/qwen3-next-80b-a3b-instruct:free',        label: 'Qwen 3 Next 80B (MoE)', note: 'Fast for size — A3B' },
+  { id: 'google/gemma-4-31b-it:free',                   label: 'Gemma 4 31B',         note: 'Google, fast' },
+  { id: 'deepseek/deepseek-v4-flash:free',              label: 'DeepSeek V4 Flash',   note: 'Snappy + smart' },
+  { id: 'openai/gpt-oss-20b:free',                      label: 'GPT-OSS 20B',         note: 'OpenAI open-source mid' },
+  { id: 'openai/gpt-oss-120b:free',                     label: 'GPT-OSS 120B',        note: 'OpenAI flagship (slower)' },
+  { id: 'meta-llama/llama-3.3-70b-instruct:free',       label: 'Llama 3.3 70B',       note: 'Solid but slower' },
 ];
 const DEFAULT_FREE_MODEL = FREE_MODELS[0].id;
 
@@ -201,7 +205,7 @@ export async function analyzeEntry(text: string, opts?: { apiKey?: string; model
             { role: 'user', content: text },
           ],
           temperature: 0.7,
-          max_tokens: 260,
+          max_tokens: 200,
           response_format: { type: 'json_object' },
         }),
       });
@@ -313,7 +317,7 @@ EXAMPLE OUTPUT:
             { role: 'user', content: userBody },
           ],
           temperature: 0.7,
-          max_tokens: 520,
+          max_tokens: 380,
           response_format: { type: 'json_object' },
         }),
       });

@@ -12,6 +12,7 @@ const SLOTS: GearSlot[] = ['head', 'body', 'hands', 'legs', 'feet', 'weapon', 't
 
 export default function Armory() {
   const xp = useHabitStore(s => s.profile.xp);
+  const gold = useHabitStore(s => s.profile.gold);
   const level = levelFromXp(xp).level;
   const owned = useHabitStore(s => s.gearOwned);
   const equipped = useHabitStore(s => s.gearEquipped);
@@ -48,12 +49,16 @@ export default function Armory() {
       {/* Top bar */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="text-[12px] text-[var(--muted)]">
-          Spend XP on permanent gear. Bonuses apply on every positive entry.
+          Spend gold on permanent gear. Higher tiers unlock as you level up.
         </div>
-        <div className="flex items-center gap-1.5">
-          <Coins className="w-3.5 h-3.5 text-[var(--accent)]" />
-          <span className="mono text-[var(--accent)]">{xp}</span>
-          <span className="text-[10px] uppercase tracking-wider text-[var(--muted-2)] ml-1">XP</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <Coins className="w-3.5 h-3.5 text-amber-300" />
+            <span className="mono text-amber-300">{gold}</span>
+            <span className="text-[10px] uppercase tracking-wider text-[var(--muted-2)] ml-1">gold</span>
+          </div>
+          <span className="text-[var(--muted-2)]">·</span>
+          <span className="text-[10px] uppercase tracking-wider text-[var(--muted-2)]">level {level}</span>
         </div>
       </div>
 
@@ -120,7 +125,7 @@ export default function Armory() {
             owned={owned.includes(item.id)}
             equippedHere={equipped[item.slot] === item.id}
             level={level}
-            xp={xp}
+            gold={gold}
             flash={flash === item.id}
             onBuy={() => buy(item.id)}
             onEquip={() => equip(item.id)}
@@ -131,13 +136,13 @@ export default function Armory() {
   );
 }
 
-function GearCard({ item, owned, equippedHere, level, xp, flash, onBuy, onEquip }: {
+function GearCard({ item, owned, equippedHere, level, gold, flash, onBuy, onEquip }: {
   item: GearItem; owned: boolean; equippedHere: boolean;
-  level: number; xp: number; flash: boolean;
+  level: number; gold: number; flash: boolean;
   onBuy: () => void; onEquip: () => void;
 }) {
   const locked = !!item.unlockLevel && level < item.unlockLevel;
-  const canAfford = xp >= item.cost;
+  const canAfford = gold >= item.cost;
   const stats = describeStats(item.stats);
   const color = RARITY_COLOR[item.rarity];
   const glow = RARITY_GLOW[item.rarity];
@@ -178,8 +183,8 @@ function GearCard({ item, owned, equippedHere, level, xp, flash, onBuy, onEquip 
             <span className="mono text-[var(--muted-2)]">FREE</span>
           ) : (
             <>
-              <Coins className="w-3.5 h-3.5 text-[var(--accent)]" />
-              <span className="mono text-[var(--fg)]">{item.cost}</span> XP
+              <Coins className="w-3.5 h-3.5 text-amber-300" />
+              <span className="mono text-[var(--fg)]">{item.cost}</span> gold
             </>
           )}
         </span>

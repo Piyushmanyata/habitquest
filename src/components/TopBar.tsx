@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Settings as SettingsIcon, BookOpen } from 'lucide-react';
+import { Settings as SettingsIcon, BookOpen, Coins } from 'lucide-react';
 import { useHabitStore } from '../store/useHabitStore';
 import { levelFromXp } from '../lib/gamification';
 import Mascot from './Mascot';
@@ -8,6 +8,7 @@ import AnimatedNumber from './AnimatedNumber';
 
 export default function TopBar({ onOpenSettings, onOpenRecap }: { onOpenSettings: () => void; onOpenRecap: () => void }) {
   const xp = useHabitStore(s => s.profile.xp);
+  const gold = useHabitStore(s => s.profile.gold);
   const streak = useHabitStore(s => s.currentStreak());
   const todayNet = useHabitStore(s => s.todayNetXp());
   const lvl = levelFromXp(xp);
@@ -26,8 +27,13 @@ export default function TopBar({ onOpenSettings, onOpenRecap }: { onOpenSettings
       <div className="flex items-center gap-5">
         <Stat label="streak" value={`${streak}d`} />
         <Stat label="level" value={<AnimatedNumber value={lvl.level} />} />
+        <div className="flex items-baseline gap-1.5" title="Gold — spend in Shop and Armory">
+          <Coins className="w-3.5 h-3.5 text-amber-300 self-center" />
+          <span className="mono text-sm font-medium text-amber-300"><AnimatedNumber value={gold} /></span>
+          <span className="text-[10px] uppercase tracking-wider text-[var(--muted-2)]">gold</span>
+        </div>
         <Stat
-          label="today"
+          label="today XP"
           value={<AnimatedNumber value={todayNet} sign />}
           accent={todayNet > 0 ? 'pos' : todayNet < 0 ? 'neg' : undefined}
         />

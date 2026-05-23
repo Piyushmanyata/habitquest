@@ -5,7 +5,7 @@ import { useHabitStore } from '../store/useHabitStore';
 import { SHOP_ITEMS, ShopItem } from '../lib/shop';
 
 export default function Shop() {
-  const xp = useHabitStore(s => s.profile.xp);
+  const gold = useHabitStore(s => s.profile.gold);
   const buy = useHabitStore(s => s.buyItem);
   const passes = useHabitStore(s => s.passes);
   const inventory = useHabitStore(s => s.inventory);
@@ -40,13 +40,13 @@ export default function Shop() {
           </div>
           <div>
             <div className="font-display font-semibold text-[15px]">The Armory</div>
-            <div className="text-[11px] text-[var(--muted)]">Spend XP on real-life passes, combat buffs, or invent your own.</div>
+            <div className="text-[11px] text-[var(--muted)]">Spend gold on real-life passes, combat buffs, or invent your own.</div>
           </div>
         </div>
         <div className="flex items-center gap-1.5">
-          <Coins className="w-4 h-4 text-[var(--accent)]" />
-          <span className="mono text-[var(--accent)] text-lg">{xp}</span>
-          <span className="text-[10px] uppercase tracking-wider text-[var(--muted-2)] ml-1">XP</span>
+          <Coins className="w-4 h-4 text-amber-300" />
+          <span className="mono text-amber-300 text-lg">{gold}</span>
+          <span className="text-[10px] uppercase tracking-wider text-[var(--muted-2)] ml-1">gold</span>
         </div>
       </div>
 
@@ -59,7 +59,7 @@ export default function Shop() {
               <Card
                 key={item.id}
                 item={item}
-                xp={xp}
+                gold={gold}
                 owned={ownedCount(item)}
                 flash={flash === item.id}
                 onBuy={() => buy(item.id)}
@@ -73,7 +73,7 @@ export default function Shop() {
       <Section title="Real-life Passes" subtitle="Logging these costs nothing — you already paid up front.">
         <Grid>
           {passesList.map(item => (
-            <Card key={item.id} item={item} xp={xp} owned={ownedCount(item)} flash={flash === item.id} onBuy={() => buy(item.id)} />
+            <Card key={item.id} item={item} gold={gold} owned={ownedCount(item)} flash={flash === item.id} onBuy={() => buy(item.id)} />
           ))}
         </Grid>
       </Section>
@@ -81,7 +81,7 @@ export default function Shop() {
       <Section title="Power-ups" subtitle="Stack the deck for your next positive entry.">
         <Grid>
           {powerupsList.map(item => (
-            <Card key={item.id} item={item} xp={xp} owned={ownedCount(item)} flash={flash === item.id} onBuy={() => buy(item.id)} />
+            <Card key={item.id} item={item} gold={gold} owned={ownedCount(item)} flash={flash === item.id} onBuy={() => buy(item.id)} />
           ))}
         </Grid>
       </Section>
@@ -147,15 +147,15 @@ function Grid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">{children}</div>;
 }
 
-function Card({ item, xp, owned, flash, onBuy, onRemove }: {
+function Card({ item, gold, owned, flash, onBuy, onRemove }: {
   item: ShopItem;
-  xp: number;
+  gold: number;
   owned: number;
   flash: boolean;
   onBuy: () => void;
   onRemove?: () => void;
 }) {
-  const canAfford = xp >= item.cost;
+  const canAfford = gold >= item.cost;
   return (
     <motion.div
       animate={flash ? { scale: [1, 1.03, 1], boxShadow: ['0 0 0 0 rgba(194,245,74,0)', '0 0 0 6px rgba(194,245,74,0.25)', '0 0 0 0 rgba(194,245,74,0)'] } : {}}
@@ -183,8 +183,8 @@ function Card({ item, xp, owned, flash, onBuy, onRemove }: {
       </div>
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-1 text-[var(--muted)] text-[12px]">
-          <Coins className="w-3.5 h-3.5 text-[var(--accent)]" />
-          <span className="mono text-[var(--fg)]">{item.cost}</span> XP
+          <Coins className="w-3.5 h-3.5 text-amber-300" />
+          <span className="mono text-[var(--fg)]">{item.cost}</span> gold
         </span>
         <button
           onClick={onBuy}
