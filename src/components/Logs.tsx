@@ -23,7 +23,8 @@ export default function Logs() {
   const [query, setQuery] = useState('');
   const [sent, setSent] = useState<SentFilter>('all');
   const [sort, setSort] = useState<SortBy>('recent');
-  const [openParents, setOpenParents] = useState<Set<string>>(new Set(CATEGORIES.map(c => c.id)));
+  // Default collapsed — user prefers a cleaner first view, can expand at will.
+  const [openParents, setOpenParents] = useState<Set<string>>(new Set());
 
   // Apply filters
   const filtered = useMemo(() => {
@@ -95,6 +96,23 @@ export default function Logs() {
   const totalFiltered = filtered.length;
   const totalAll = entries.length;
 
+  // Aggregate KPIs across whatever's currently filtered.
+  const kpis = useMemo(() => {
+    let wins = 0, slips = 0, neutral = 0, xp = 0, intensitySum = 0;
+    for (const e of filtered) {
+      xp += e.xpDelta;
+      intensitySum += (e.intensity || 0);
+      if (e.sentiment === 'positive') wins++;
+      else if (e.sentiment === 'negative') slips++;
+      else neutral++;
+    }
+    return {
+      wins, slips, neutral, xp,
+      avgIntensity: filtered.length ? (intensitySum / filtered.length).toFixed(1) : '—',
+      winRatio: wins + slips ? Math.round((wins / (wins + slips)) * 100) : null,
+    };
+  }, [filtered]);
+
   if (totalAll === 0) {
     return (
       <div className="surface p-10 text-center">
@@ -106,6 +124,21 @@ export default function Logs() {
 
   return (
     <div className="space-y-4">
+      {/* KPI strip */}
+      <motion.div
+        initial={{ opacity: 0, y: -6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2"
+      >
+        <KpiTile label="Entries" value={`${totalFiltered}${totalFiltered !== totalAll ? `/${totalAll}` : ''}`} />
+        <KpiTile label="Wins" value={kpis.wins} accent="pos" />
+        <KpiTile label="Slips" value={kpis.slips} accent="neg" />
+        <KpiTile label="Neutral" value={kpis.neutral} />
+        <KpiTile label="Net XP" value={`${kpis.xp >= 0 ? '+' : ''}${kpis.xp}`} accent={kpis.xp >= 0 ? 'pos' : 'neg'} />
+        <KpiTile label="Win rate" value={kpis.winRatio === null ? '—' : `${kpis.winRatio}%`} accent={kpis.winRatio !== null && kpis.winRatio >= 60 ? 'pos' : undefined} />
+      </motion.div>
+
       {/* Toolbar */}
       <div className="surface p-3 flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-2 flex-1 min-w-[200px]">
@@ -239,6 +272,16 @@ export default function Logs() {
   );
 }
 
+function KpiTile({ label, value, accent }: { label: string; value: React.ReactNode; accent?: 'pos' | 'neg' }) {
+  const cls = accent === 'pos' ? 'text-[var(--pos)]' : accent === 'neg' ? 'text-[var(--neg)]' : 'text-[var(--fg)]';
+  return (
+    <div className="surface p-2.5">
+      <div className="text-[9.5px] uppercase tracking-wider text-[var(--muted-2)]">{label}</div>
+      <div className={`mono text-lg mt-0.5 leading-tight ${cls}`}>{value}</div>
+    </div>
+  );
+}
+
 function FilterChip({ children, active, onClick, color }: {
   children: React.ReactNode; active: boolean; onClick: () => void; color?: 'pos' | 'neg';
 }) {
@@ -262,7 +305,7 @@ function LogRow({ e, parentEmoji, onDelete }: { e: Entry; parentEmoji: string; o
   const isPos = e.sentiment === 'positive';
   const isNeg = e.sentiment === 'negative';
   return (
-    <div className="flex items-start gap-2 p-2 rounded border hairline-2 bg-[var(--panel-2)] group">
+    <div className="flex items-start gap-2 p-2 rounded border hairline-2 bg-[var(--panel-2)] group fade-up transition hover:border-[var(--line-2)] hover:bg-[var(--panel)]">
       <div className={`mt-1 w-1.5 h-1.5 rounded-full shrink-0 ${isPos ? 'bg-[var(--pos)]' : isNeg ? 'bg-[var(--neg)]' : 'bg-[var(--muted-2)]'}`} />
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2">

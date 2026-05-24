@@ -396,13 +396,32 @@ function applyOneEntry(quick: EntryAnalysis, batchId: string, get: any, set: any
 }
 
 function badgeCtxFor(s: State) {
+  const pos = s.entries.filter(e => e.sentiment === 'positive');
+  const neg = s.entries.filter(e => e.sentiment === 'negative');
+  const emos = new Set<string>();
+  let reflections = 0;
+  let heavy = 0;
+  for (const e of s.entries) {
+    if (e.emotion) emos.add(e.emotion);
+    if (e.reflection) reflections++;
+    if ((e.intensity || 0) >= 4) heavy++;
+  }
   return {
-    totalCompletions: s.entries.filter(e => e.sentiment === 'positive').length,
+    totalCompletions: pos.length,
     longestStreak: s.profile.longestStreak,
     level: levelFromXp(s.profile.xp).level,
     uniqueCategories: new Set(s.entries.map(e => e.parentId)).size,
     questsCompleted: s.questsCompletedTotal,
     perfectDays: s.profile.perfectDays,
+    gold: s.profile.gold,
+    hourlyBest: s.profile.hourlyBest,
+    bossesDefeated: s.profile.bossesDefeated,
+    comboBest: s.comboBest,
+    totalNegatives: neg.length,
+    reflectionCount: reflections,
+    uniqueEmotions: emos.size,
+    highIntensityCount: heavy,
+    totalEntries: s.entries.length,
   };
 }
 
@@ -1030,16 +1049,7 @@ export const useHabitStore = create<State>()(
       },
       currentStreak() { return computeStreak(get().entries); },
       unlockedBadges() {
-        const s = get();
-        const ctx = {
-          totalCompletions: s.entries.filter(e => e.sentiment === 'positive').length,
-          longestStreak: s.profile.longestStreak,
-          level: levelFromXp(s.profile.xp).level,
-          uniqueCategories: new Set(s.entries.map(e => e.parentId)).size,
-          questsCompleted: s.questsCompletedTotal,
-          perfectDays: s.profile.perfectDays,
-        };
-        return BADGES.filter(b => b.earned(ctx)).map(b => b.id);
+        return BADGES.filter(b => b.earned(badgeCtxFor(get()))).map(b => b.id);
       },
     }),
     {

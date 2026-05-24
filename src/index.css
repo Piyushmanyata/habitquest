@@ -272,3 +272,186 @@ input:focus, textarea:focus, select:focus { outline: none; }
 .typing-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin: 0 2px; animation: hq-dot 1.1s ease-in-out infinite; }
 .typing-dot:nth-child(2) { animation-delay: 0.15s; }
 .typing-dot:nth-child(3) { animation-delay: 0.30s; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   EXPANSION: heavier motion + visual layer
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Rotating gradient overlay on every Section — slow, ambient */
+@keyframes hq-rotate-glow {
+  0%   { transform: rotate(0deg)   scale(1.5); opacity: 0.35; }
+  50%  { transform: rotate(180deg) scale(1.7); opacity: 0.55; }
+  100% { transform: rotate(360deg) scale(1.5); opacity: 0.35; }
+}
+.section-glow {
+  position: absolute;
+  inset: -40%;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(60px);
+  opacity: 0.4;
+  background: conic-gradient(from 0deg, transparent, var(--section-glow-color, rgba(194,245,74,0.18)), transparent 65%);
+  animation: hq-rotate-glow 18s linear infinite;
+}
+.section-hero    { --section-glow-color: rgba(168,85,247,0.20); }
+.section-journal { --section-glow-color: rgba(194,245,74,0.18); }
+.section-battle  { --section-glow-color: rgba(251,191,36,0.20); }
+.section-insight { --section-glow-color: rgba(125,211,252,0.20); }
+.section-armory  { --section-glow-color: rgba(168,85,247,0.20); }
+.section-chat    { --section-glow-color: rgba(125,211,252,0.20); }
+
+/* Magnetic hover lift for cards inside surface */
+.surface {
+  will-change: transform, box-shadow;
+}
+.surface.lift-hover:hover {
+  transform: translateY(-3px);
+  border-color: var(--line-2);
+  box-shadow: 0 12px 40px -16px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
+}
+
+/* Animated underline shimmer for section titles on first reveal */
+@keyframes hq-title-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.section-title {
+  background: linear-gradient(
+    90deg,
+    var(--fg) 0%,
+    var(--fg) 35%,
+    #fff 50%,
+    var(--fg) 65%,
+    var(--fg) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+          background-clip: text;
+  color: transparent;
+  animation: hq-title-shimmer 6s ease-in-out infinite;
+}
+
+/* Slow pulsing dot used in the section header */
+@keyframes hq-pulse-dot {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50%      { opacity: 1;   transform: scale(1.25); }
+}
+.pulse-dot { animation: hq-pulse-dot 2.4s ease-in-out infinite; }
+
+/* Float drift used by ambient decorations */
+@keyframes hq-float {
+  0%, 100% { transform: translate(0, 0); }
+  33%      { transform: translate(8px, -10px); }
+  66%      { transform: translate(-6px, 12px); }
+}
+.float-slow { animation: hq-float 14s ease-in-out infinite; }
+.float-mid  { animation: hq-float 9s  ease-in-out infinite; }
+.float-fast { animation: hq-float 6s  ease-in-out infinite; }
+
+/* Animated number tick — used after data updates */
+@keyframes hq-pop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+.pop-tick { animation: hq-pop 0.45s cubic-bezier(.5,1.6,.5,1) 1; }
+
+/* Animated gradient sweep — strong eye-candy used on banners/CTA */
+@keyframes hq-sweep {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+.sweep-bg {
+  background: linear-gradient(90deg,
+    rgba(194,245,74,0.12),
+    rgba(125,211,252,0.12),
+    rgba(168,85,247,0.12),
+    rgba(251,191,36,0.12),
+    rgba(194,245,74,0.12)
+  );
+  background-size: 200% 100%;
+  animation: hq-sweep 12s linear infinite;
+}
+
+/* Aurora-style background for hero accents */
+@keyframes hq-aurora {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50%      { transform: translate3d(0, -8px, 0) rotate(2deg); }
+}
+.aurora { animation: hq-aurora 12s ease-in-out infinite; transform-origin: 50% 50%; }
+
+/* Rarity tier glow halos for badges */
+.tier-glow-common    { box-shadow: 0 0 0 0 transparent; }
+.tier-glow-rare      { box-shadow: 0 0 18px -6px rgba(125,211,252,0.55); }
+.tier-glow-epic      { box-shadow: 0 0 22px -6px rgba(168,85,247,0.6); }
+.tier-glow-legendary { box-shadow: 0 0 28px -6px rgba(251,191,36,0.65); }
+.tier-glow-mythic    { box-shadow: 0 0 34px -4px rgba(255,77,109,0.8), 0 0 64px -10px rgba(168,85,247,0.5); }
+
+/* Tier rim — animated for legendary+ */
+@keyframes hq-rim-spin {
+  0%   { --rim-pos: 0deg; }
+  100% { --rim-pos: 360deg; }
+}
+.tier-rim-legendary,
+.tier-rim-mythic {
+  position: relative;
+}
+.tier-rim-legendary::before,
+.tier-rim-mythic::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(from var(--rim-pos, 0deg),
+    rgba(251,191,36,0.9),
+    rgba(255,77,109,0.6),
+    rgba(168,85,247,0.6),
+    rgba(125,211,252,0.6),
+    rgba(251,191,36,0.9));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  animation: hq-rim-spin 6s linear infinite;
+  pointer-events: none;
+}
+.tier-rim-mythic::before {
+  animation-duration: 3.4s;
+}
+
+/* Property registration required for animating --rim-pos */
+@property --rim-pos {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+/* Slim shine sweeping across the entire row — used on the streak slider thumbs */
+@keyframes hq-bar-shine {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(220%); }
+}
+.bar-shine {
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+  width: 30%;
+  animation: hq-bar-shine 2.8s ease-in-out infinite;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+/* Stagger hint for child items — opacity entrance */
+@keyframes hq-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: hq-fade-up 0.45s cubic-bezier(.22,1,.36,1) both; }
+
+/* tiny tick used for radial sweep */
+@keyframes hq-ring-spin {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.ring-spin { animation: hq-ring-spin 8s linear infinite; }
+

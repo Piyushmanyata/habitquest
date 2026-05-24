@@ -1,6 +1,9 @@
 import { useMemo } from 'react';
 import { useHabitStore, Entry } from '../store/useHabitStore';
-import { DeepInsights, StreakHistory } from './AnalyticsExtras';
+import {
+  DeepInsights, StreakHistory, PositivityTrend, GoldCurve,
+  BestHours, CategoryMomentum, IntensityTrend, EmotionXp,
+} from './AnalyticsExtras';
 import { CATEGORIES, CAT_BY_ID } from '../lib/categories';
 import { dayKey } from '../lib/gamification';
 
@@ -241,6 +244,24 @@ export default function Analytics() {
 
       {/* Deep insights — best/worst day, intensity distribution, top slip */}
       <DeepInsights entries={entries} byDay={byDay} days30={days30} />
+
+      {/* Positivity ratio trend (7-day rolling, last 30 days) */}
+      <PositivityTrend entries={entries} days30={days30} />
+
+      {/* Gold accumulation curve (all time) + Best hours of the day */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <GoldCurve entries={entries} />
+        <BestHours entries={entries} />
+      </div>
+
+      {/* Category momentum + intensity trend */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <CategoryMomentum entries={entries} />
+        <IntensityTrend entries={entries} days30={days30} />
+      </div>
+
+      {/* Emotion ↔ XP correlation */}
+      <EmotionXp entries={entries} />
 
       {/* Streak history (last 30 days) */}
       <Panel title="Streak history — last 30 days">

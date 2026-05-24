@@ -32,6 +32,7 @@ import FloatingNumbers from './components/FloatingNumbers';
 import Character from './components/Character';
 import Armory from './components/Armory';
 import Section from './components/Section';
+import StreakSliders from './components/StreakSliders';
 import { useHabitStore } from './store/useHabitStore';
 
 type Tab = 'home' | 'logs' | 'analytics' | 'mood' | 'shop';
@@ -109,21 +110,25 @@ export default function App() {
           {/* ═══ HERO ═══ */}
           <Section
             id="hero" theme="hero"
-            eyebrow="01 · your hero" title="Character & Streak"
-            subtitle="Equip gear, watch your streak burn, and aim at today's boss."
+            eyebrow="01 · your hero" title="Character & Streaks"
+            subtitle="Equip gear, watch every time-window streak, and aim at today's boss."
           >
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <Character />
               <StreakCalendar />
               <Boss />
             </div>
+            <div className="mt-4">
+              <StreakSliders />
+            </div>
           </Section>
 
-          {/* ═══ JOURNAL ═══ */}
+          {/* ═══ JOURNAL — collapsible ═══ */}
           <Section
             id="journal" theme="journal"
             eyebrow="02 · log the day" title="Journal"
             subtitle="Write what you did, how you felt, what you thought. Sage scores it."
+            collapsible defaultOpen
           >
             <div className="space-y-4">
               <PassBar />

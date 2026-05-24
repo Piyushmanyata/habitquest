@@ -41,11 +41,15 @@ export function streakMultiplier(streak: number): number {
 }
 
 // ----- Badges -----
+export type BadgeTier = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
+
 export type Badge = {
   id: string;
   name: string;
   emoji: string;
   description: string;
+  tier: BadgeTier;
+  group: 'logging' | 'streak' | 'level' | 'variety' | 'quests' | 'perfect' | 'gold' | 'mood' | 'combat' | 'wisdom';
   /** returns true if the user has earned this badge */
   earned: (ctx: BadgeCtx) => boolean;
   /** returns progress 0..1 toward earning it */
@@ -61,92 +65,281 @@ export type BadgeCtx = {
   uniqueCategories: number;
   questsCompleted: number;
   perfectDays: number;
+  // ── new dimensions for richer badge progression ─────────────────
+  gold: number;
+  hourlyBest: number;
+  bossesDefeated: number;
+  comboBest: number;
+  totalNegatives: number;
+  reflectionCount: number;
+  uniqueEmotions: number;
+  highIntensityCount: number; // intensity 4 or 5
+  totalEntries: number;
 };
 
 function pct(n: number, max: number) { return Math.min(1, n / max); }
 function ratioLabel(now: number, max: number, unit: string) { return `${Math.min(now, max)} / ${max} ${unit}`; }
 
+export const TIER_COLOR: Record<BadgeTier, string> = {
+  common:    '#9ca3af',
+  rare:      '#7dd3fc',
+  epic:      '#a855f7',
+  legendary: '#fbbf24',
+  mythic:    '#ff4d6d',
+};
+
+export const TIER_ORDER: BadgeTier[] = ['common', 'rare', 'epic', 'legendary', 'mythic'];
+
 export const BADGES: Badge[] = [
-  { id: 'first',     name: 'First Step',      emoji: '👣', description: 'Log your first positive entry.',
+  // ═══ LOGGING — sheer volume of positives ══════════════════════════════
+  { id: 'first',     name: 'First Step',      emoji: '👣', tier: 'common', group: 'logging',
+    description: 'Log your first positive entry.',
     earned: c => c.totalCompletions >= 1,
     progress: c => pct(c.totalCompletions, 1),
     progressLabel: c => ratioLabel(c.totalCompletions, 1, 'positives') },
-  { id: 'ten',       name: 'Getting Going',   emoji: '🔟', description: 'Log 10 positive entries.',
+  { id: 'ten',       name: 'Getting Going',   emoji: '🔟', tier: 'common', group: 'logging',
+    description: 'Log 10 positive entries.',
     earned: c => c.totalCompletions >= 10,
     progress: c => pct(c.totalCompletions, 10),
     progressLabel: c => ratioLabel(c.totalCompletions, 10, 'positives') },
-  { id: 'fifty',     name: 'Half Century',    emoji: '🏅', description: 'Log 50 positive entries.',
+  { id: 'fifty',     name: 'Half Century',    emoji: '🏅', tier: 'rare', group: 'logging',
+    description: 'Log 50 positive entries.',
     earned: c => c.totalCompletions >= 50,
     progress: c => pct(c.totalCompletions, 50),
     progressLabel: c => ratioLabel(c.totalCompletions, 50, 'positives') },
-  { id: 'hundo',     name: 'Centurion',       emoji: '💯', description: 'Log 100 positive entries.',
+  { id: 'hundo',     name: 'Centurion',       emoji: '💯', tier: 'epic', group: 'logging',
+    description: 'Log 100 positive entries.',
     earned: c => c.totalCompletions >= 100,
     progress: c => pct(c.totalCompletions, 100),
     progressLabel: c => ratioLabel(c.totalCompletions, 100, 'positives') },
-  { id: 'fivehundred', name: 'Five Hundred',  emoji: '🎯', description: 'Log 500 positive entries — masterclass.',
+  { id: 'fivehundred', name: 'Five Hundred',  emoji: '🎯', tier: 'legendary', group: 'logging',
+    description: 'Log 500 positive entries — masterclass.',
     earned: c => c.totalCompletions >= 500,
     progress: c => pct(c.totalCompletions, 500),
     progressLabel: c => ratioLabel(c.totalCompletions, 500, 'positives') },
-  { id: 's3',        name: 'On A Roll',       emoji: '🔥', description: 'Hit a 3-day streak.',
+  { id: 'thousand',  name: 'Iron Habit',      emoji: '⚙️', tier: 'mythic', group: 'logging',
+    description: '1,000 positive entries logged. Mythic-level discipline.',
+    earned: c => c.totalCompletions >= 1000,
+    progress: c => pct(c.totalCompletions, 1000),
+    progressLabel: c => ratioLabel(c.totalCompletions, 1000, 'positives') },
+
+  // ═══ STREAK — multi-day discipline ═══════════════════════════════════
+  { id: 's3',        name: 'On A Roll',       emoji: '🔥', tier: 'common', group: 'streak',
+    description: 'Hit a 3-day streak.',
     earned: c => c.longestStreak >= 3,
     progress: c => pct(c.longestStreak, 3),
     progressLabel: c => ratioLabel(c.longestStreak, 3, 'days') },
-  { id: 's7',        name: 'Week Warrior',    emoji: '⚔️', description: 'Hit a 7-day streak.',
+  { id: 's7',        name: 'Week Warrior',    emoji: '⚔️', tier: 'rare', group: 'streak',
+    description: 'Hit a 7-day streak.',
     earned: c => c.longestStreak >= 7,
     progress: c => pct(c.longestStreak, 7),
     progressLabel: c => ratioLabel(c.longestStreak, 7, 'days') },
-  { id: 's14',       name: 'Fortnight Force', emoji: '🌗', description: 'Hit a 14-day streak.',
+  { id: 's14',       name: 'Fortnight Force', emoji: '🌗', tier: 'rare', group: 'streak',
+    description: 'Hit a 14-day streak.',
     earned: c => c.longestStreak >= 14,
     progress: c => pct(c.longestStreak, 14),
     progressLabel: c => ratioLabel(c.longestStreak, 14, 'days') },
-  { id: 's30',       name: 'Unbreakable',     emoji: '🛡️', description: '30-day streak — unbreakable.',
+  { id: 's30',       name: 'Unbreakable',     emoji: '🛡️', tier: 'epic', group: 'streak',
+    description: '30-day streak — unbreakable.',
     earned: c => c.longestStreak >= 30,
     progress: c => pct(c.longestStreak, 30),
     progressLabel: c => ratioLabel(c.longestStreak, 30, 'days') },
-  { id: 's100',      name: 'Centennial Soul', emoji: '🌌', description: '100-day streak — mythic.',
+  { id: 's60',       name: 'Two-Month Titan', emoji: '🗿', tier: 'legendary', group: 'streak',
+    description: '60-day streak — granite consistency.',
+    earned: c => c.longestStreak >= 60,
+    progress: c => pct(c.longestStreak, 60),
+    progressLabel: c => ratioLabel(c.longestStreak, 60, 'days') },
+  { id: 's100',      name: 'Centennial Soul', emoji: '🌌', tier: 'mythic', group: 'streak',
+    description: '100-day streak — mythic.',
     earned: c => c.longestStreak >= 100,
     progress: c => pct(c.longestStreak, 100),
     progressLabel: c => ratioLabel(c.longestStreak, 100, 'days') },
-  { id: 'lvl5',      name: 'Rising Hero',     emoji: '⭐', description: 'Reach level 5.',
+
+  // ═══ LEVEL — XP curve milestones ═════════════════════════════════════
+  { id: 'lvl5',      name: 'Rising Hero',     emoji: '⭐', tier: 'common', group: 'level',
+    description: 'Reach level 5.',
     earned: c => c.level >= 5,
     progress: c => pct(c.level, 5),
     progressLabel: c => ratioLabel(c.level, 5, 'lvl') },
-  { id: 'lvl10',     name: 'Veteran',         emoji: '🌟', description: 'Reach level 10.',
+  { id: 'lvl10',     name: 'Veteran',         emoji: '🌟', tier: 'rare', group: 'level',
+    description: 'Reach level 10.',
     earned: c => c.level >= 10,
     progress: c => pct(c.level, 10),
     progressLabel: c => ratioLabel(c.level, 10, 'lvl') },
-  { id: 'lvl20',     name: 'Champion',        emoji: '👑', description: 'Reach level 20.',
+  { id: 'lvl20',     name: 'Champion',        emoji: '👑', tier: 'epic', group: 'level',
+    description: 'Reach level 20.',
     earned: c => c.level >= 20,
     progress: c => pct(c.level, 20),
     progressLabel: c => ratioLabel(c.level, 20, 'lvl') },
-  { id: 'lvl30',     name: 'Mythic',          emoji: '🪐', description: 'Reach level 30 — top tier.',
+  { id: 'lvl30',     name: 'Mythic',          emoji: '🪐', tier: 'legendary', group: 'level',
+    description: 'Reach level 30 — top tier.',
     earned: c => c.level >= 30,
     progress: c => pct(c.level, 30),
     progressLabel: c => ratioLabel(c.level, 30, 'lvl') },
-  { id: 'diverse',   name: 'Renaissance',     emoji: '🎭', description: 'Log in 4 different categories.',
+  { id: 'lvl50',     name: 'Ascendant',       emoji: '☄️', tier: 'mythic', group: 'level',
+    description: 'Reach level 50 — into mythic territory.',
+    earned: c => c.level >= 50,
+    progress: c => pct(c.level, 50),
+    progressLabel: c => ratioLabel(c.level, 50, 'lvl') },
+
+  // ═══ VARIETY — breadth of life logged ════════════════════════════════
+  { id: 'diverse',   name: 'Renaissance',     emoji: '🎭', tier: 'common', group: 'variety',
+    description: 'Log in 4 different categories.',
     earned: c => c.uniqueCategories >= 4,
     progress: c => pct(c.uniqueCategories, 4),
     progressLabel: c => ratioLabel(c.uniqueCategories, 4, 'cats') },
-  { id: 'allcats',   name: 'Renaissance Lord',emoji: '🌐', description: 'Log in all 7 categories at least once.',
+  { id: 'allcats',   name: 'Renaissance Lord',emoji: '🌐', tier: 'epic', group: 'variety',
+    description: 'Log in all 7 categories at least once.',
     earned: c => c.uniqueCategories >= 7,
     progress: c => pct(c.uniqueCategories, 7),
     progressLabel: c => ratioLabel(c.uniqueCategories, 7, 'cats') },
-  { id: 'q5',        name: 'Questmaster',     emoji: '📜', description: 'Finish 5 daily quests.',
+
+  // ═══ QUESTS — short-term goal hits ═══════════════════════════════════
+  { id: 'q5',        name: 'Questmaster',     emoji: '📜', tier: 'common', group: 'quests',
+    description: 'Finish 5 daily quests.',
     earned: c => c.questsCompleted >= 5,
     progress: c => pct(c.questsCompleted, 5),
     progressLabel: c => ratioLabel(c.questsCompleted, 5, 'quests') },
-  { id: 'q25',       name: 'Quest King',      emoji: '👑', description: 'Finish 25 daily quests.',
+  { id: 'q25',       name: 'Quest King',      emoji: '👑', tier: 'rare', group: 'quests',
+    description: 'Finish 25 daily quests.',
     earned: c => c.questsCompleted >= 25,
     progress: c => pct(c.questsCompleted, 25),
     progressLabel: c => ratioLabel(c.questsCompleted, 25, 'quests') },
-  { id: 'perfect3',  name: 'Triple Perfect',  emoji: '💎', description: '3 perfect days (3+ positives, 0 slips).',
+  { id: 'q100',      name: 'Quest Emperor',   emoji: '📿', tier: 'epic', group: 'quests',
+    description: 'Finish 100 daily quests.',
+    earned: c => c.questsCompleted >= 100,
+    progress: c => pct(c.questsCompleted, 100),
+    progressLabel: c => ratioLabel(c.questsCompleted, 100, 'quests') },
+
+  // ═══ PERFECT DAYS — clean wins, zero slips ═══════════════════════════
+  { id: 'perfect3',  name: 'Triple Perfect',  emoji: '💎', tier: 'rare', group: 'perfect',
+    description: '3 perfect days (3+ positives, 0 slips).',
     earned: c => c.perfectDays >= 3,
     progress: c => pct(c.perfectDays, 3),
     progressLabel: c => ratioLabel(c.perfectDays, 3, 'perfect') },
-  { id: 'perfect14', name: 'Spotless Two-Wk', emoji: '✨', description: '14 perfect days.',
+  { id: 'perfect14', name: 'Spotless Two-Wk', emoji: '✨', tier: 'epic', group: 'perfect',
+    description: '14 perfect days.',
     earned: c => c.perfectDays >= 14,
     progress: c => pct(c.perfectDays, 14),
     progressLabel: c => ratioLabel(c.perfectDays, 14, 'perfect') },
+  { id: 'perfect50', name: 'Marble Month×2',  emoji: '🏛️', tier: 'mythic', group: 'perfect',
+    description: '50 perfect days. The marble life.',
+    earned: c => c.perfectDays >= 50,
+    progress: c => pct(c.perfectDays, 50),
+    progressLabel: c => ratioLabel(c.perfectDays, 50, 'perfect') },
+
+  // ═══ GOLD — economic milestones ══════════════════════════════════════
+  { id: 'gold100',   name: 'First Hoard',     emoji: '🪙', tier: 'common', group: 'gold',
+    description: 'Accumulate 100 gold total.',
+    earned: c => c.gold >= 100,
+    progress: c => pct(c.gold, 100),
+    progressLabel: c => ratioLabel(c.gold, 100, 'gold') },
+  { id: 'gold500',   name: 'Treasure Chest',  emoji: '💰', tier: 'rare', group: 'gold',
+    description: 'Hold 500 gold at once.',
+    earned: c => c.gold >= 500,
+    progress: c => pct(c.gold, 500),
+    progressLabel: c => ratioLabel(c.gold, 500, 'gold') },
+  { id: 'gold2500',  name: 'Vault Walker',    emoji: '🏦', tier: 'epic', group: 'gold',
+    description: 'Hold 2,500 gold at once.',
+    earned: c => c.gold >= 2500,
+    progress: c => pct(c.gold, 2500),
+    progressLabel: c => ratioLabel(c.gold, 2500, 'gold') },
+  { id: 'gold10k',   name: 'Dragon Hoard',    emoji: '🐉', tier: 'legendary', group: 'gold',
+    description: 'Hold 10,000 gold at once.',
+    earned: c => c.gold >= 10000,
+    progress: c => pct(c.gold, 10000),
+    progressLabel: c => ratioLabel(c.gold, 10000, 'gold') },
+
+  // ═══ MOOD — emotional self-awareness ═════════════════════════════════
+  { id: 'reflect5',  name: 'Inner Voice',     emoji: '🗯️', tier: 'common', group: 'mood',
+    description: 'Write 5 reflections in your journal.',
+    earned: c => c.reflectionCount >= 5,
+    progress: c => pct(c.reflectionCount, 5),
+    progressLabel: c => ratioLabel(c.reflectionCount, 5, 'reflections') },
+  { id: 'reflect30', name: 'Therapist',       emoji: '🪞', tier: 'epic', group: 'mood',
+    description: 'Write 30 reflections.',
+    earned: c => c.reflectionCount >= 30,
+    progress: c => pct(c.reflectionCount, 30),
+    progressLabel: c => ratioLabel(c.reflectionCount, 30, 'reflections') },
+  { id: 'mood7',     name: 'Mood Spectrum',   emoji: '🌈', tier: 'rare', group: 'mood',
+    description: 'Tag 7 distinct emotions.',
+    earned: c => c.uniqueEmotions >= 7,
+    progress: c => pct(c.uniqueEmotions, 7),
+    progressLabel: c => ratioLabel(c.uniqueEmotions, 7, 'emotions') },
+  { id: 'mood13',    name: 'Full Palette',    emoji: '🎨', tier: 'legendary', group: 'mood',
+    description: 'Tag all 13 emotions at least once.',
+    earned: c => c.uniqueEmotions >= 13,
+    progress: c => pct(c.uniqueEmotions, 13),
+    progressLabel: c => ratioLabel(c.uniqueEmotions, 13, 'emotions') },
+  { id: 'honest10',  name: 'Brutally Honest', emoji: '🪤', tier: 'rare', group: 'mood',
+    description: 'Log 10 slips honestly — self-awareness counts.',
+    earned: c => c.totalNegatives >= 10,
+    progress: c => pct(c.totalNegatives, 10),
+    progressLabel: c => ratioLabel(c.totalNegatives, 10, 'slips logged') },
+
+  // ═══ COMBAT — boss + combo achievements ══════════════════════════════
+  { id: 'boss1',     name: 'First Slay',      emoji: '🗡️', tier: 'common', group: 'combat',
+    description: 'Defeat your first boss.',
+    earned: c => c.bossesDefeated >= 1,
+    progress: c => pct(c.bossesDefeated, 1),
+    progressLabel: c => ratioLabel(c.bossesDefeated, 1, 'bosses') },
+  { id: 'boss10',    name: 'Beast Hunter',    emoji: '🏹', tier: 'rare', group: 'combat',
+    description: 'Defeat 10 bosses.',
+    earned: c => c.bossesDefeated >= 10,
+    progress: c => pct(c.bossesDefeated, 10),
+    progressLabel: c => ratioLabel(c.bossesDefeated, 10, 'bosses') },
+  { id: 'boss50',    name: 'Boss Slayer',     emoji: '⚔️', tier: 'epic', group: 'combat',
+    description: 'Defeat 50 bosses.',
+    earned: c => c.bossesDefeated >= 50,
+    progress: c => pct(c.bossesDefeated, 50),
+    progressLabel: c => ratioLabel(c.bossesDefeated, 50, 'bosses') },
+  { id: 'boss200',   name: 'Demon Lord',      emoji: '👹', tier: 'mythic', group: 'combat',
+    description: 'Defeat 200 bosses. Mythic huntmaster.',
+    earned: c => c.bossesDefeated >= 200,
+    progress: c => pct(c.bossesDefeated, 200),
+    progressLabel: c => ratioLabel(c.bossesDefeated, 200, 'bosses') },
+  { id: 'combo5',    name: 'Combo Crafter',   emoji: '🎇', tier: 'common', group: 'combat',
+    description: 'Hit a 5-combo.',
+    earned: c => c.comboBest >= 5,
+    progress: c => pct(c.comboBest, 5),
+    progressLabel: c => ratioLabel(c.comboBest, 5, 'combo') },
+  { id: 'combo10',   name: 'Combo King',      emoji: '💥', tier: 'epic', group: 'combat',
+    description: 'Hit a 10-combo.',
+    earned: c => c.comboBest >= 10,
+    progress: c => pct(c.comboBest, 10),
+    progressLabel: c => ratioLabel(c.comboBest, 10, 'combo') },
+
+  // ═══ WISDOM — hourly + intensity + meta ══════════════════════════════
+  { id: 'hour6',     name: 'Hourly Habit',    emoji: '⏰', tier: 'common', group: 'wisdom',
+    description: 'Log in 6 consecutive hours.',
+    earned: c => c.hourlyBest >= 6,
+    progress: c => pct(c.hourlyBest, 6),
+    progressLabel: c => ratioLabel(c.hourlyBest, 6, 'hours') },
+  { id: 'hour12',    name: 'Half-Day Pulse',  emoji: '🕛', tier: 'rare', group: 'wisdom',
+    description: 'Log every hour for 12 hours straight.',
+    earned: c => c.hourlyBest >= 12,
+    progress: c => pct(c.hourlyBest, 12),
+    progressLabel: c => ratioLabel(c.hourlyBest, 12, 'hours') },
+  { id: 'hour24',    name: 'Full Cycle',      emoji: '🕰️', tier: 'legendary', group: 'wisdom',
+    description: 'Log every hour for 24 hours. Inhuman.',
+    earned: c => c.hourlyBest >= 24,
+    progress: c => pct(c.hourlyBest, 24),
+    progressLabel: c => ratioLabel(c.hourlyBest, 24, 'hours') },
+  { id: 'intense5',  name: 'Heavy Lifter',    emoji: '🏋️', tier: 'rare', group: 'wisdom',
+    description: 'Log 5 intensity-4+ entries.',
+    earned: c => c.highIntensityCount >= 5,
+    progress: c => pct(c.highIntensityCount, 5),
+    progressLabel: c => ratioLabel(c.highIntensityCount, 5, 'heavy') },
+  { id: 'intense25', name: 'Hard Mode',       emoji: '🦾', tier: 'epic', group: 'wisdom',
+    description: 'Log 25 intensity-4+ entries.',
+    earned: c => c.highIntensityCount >= 25,
+    progress: c => pct(c.highIntensityCount, 25),
+    progressLabel: c => ratioLabel(c.highIntensityCount, 25, 'heavy') },
+  { id: 'intense100',name: 'Epic Workhorse',  emoji: '🐉', tier: 'mythic', group: 'wisdom',
+    description: 'Log 100 intensity-4+ entries.',
+    earned: c => c.highIntensityCount >= 100,
+    progress: c => pct(c.highIntensityCount, 100),
+    progressLabel: c => ratioLabel(c.highIntensityCount, 100, 'heavy') },
 ];
 
 // ----- Daily quests -----
