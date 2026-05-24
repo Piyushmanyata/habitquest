@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import TopBar from './components/TopBar';
 import JournalInput from './components/JournalInput';
-import Timeline from './components/Timeline';
 import Quests from './components/Quests';
 import Stats from './components/Stats';
 import Settings from './components/Settings';
@@ -127,13 +126,13 @@ export default function App() {
           <Section
             id="journal" theme="journal"
             eyebrow="02 · log the day" title="Journal"
-            subtitle="Write what you did, how you felt, what you thought. Sage scores it."
+            subtitle="Write what you did. Past entries live in the Logs tab — by category or by date."
             collapsible defaultOpen
           >
             <div className="space-y-4">
               <PassBar />
               <JournalInput />
-              <Timeline />
+              <JumpToLogs onClick={() => setTab('logs')} />
             </div>
           </Section>
 
@@ -214,6 +213,26 @@ function TabBtn({ name, active, onClick, kbd }: { name: string; active: boolean;
     >
       {name}
       {kbd && <span className={`mono text-[9px] px-1 py-0.5 rounded border ${active ? 'border-[#0a0a0b]/40 text-[#0a0a0b]/70' : 'border-[var(--line-2)] text-[var(--muted-2)]'}`}>{kbd}</span>}
+    </button>
+  );
+}
+
+function JumpToLogs({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full surface-soft p-3 flex items-center gap-3 hover:bg-white/[0.03] transition group text-left"
+    >
+      <div className="w-9 h-9 rounded-md bg-[var(--panel-2)] grid place-items-center text-base border hairline-2">
+        📜
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[12.5px] font-medium text-[var(--fg)]">See all past entries</div>
+        <div className="text-[10.5px] text-[var(--muted-2)] mono uppercase tracking-wider">
+          jump to logs · view by category or by date
+        </div>
+      </div>
+      <span className="text-[var(--muted-2)] group-hover:text-[var(--accent)] transition mono text-xs">→</span>
     </button>
   );
 }
