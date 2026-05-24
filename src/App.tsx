@@ -9,7 +9,6 @@ import XpToast from './components/XpToast';
 import ScreenFx from './components/ScreenFx';
 import DailyRecap from './components/DailyRecap';
 import Boss from './components/Boss';
-import Inventory from './components/Inventory';
 import LootToast from './components/LootToast';
 import Analytics from './components/Analytics';
 import AiStatus from './components/AiStatus';
@@ -136,13 +135,12 @@ export default function App() {
           {/* ═══ BATTLE ═══ */}
           <Section
             id="battle" theme="battle"
-            eyebrow="03 · today's fight" title="Challenge, Quests & Inventory"
-            subtitle="Daily challenge from Sage, rolling quests, consumables you've earned or bought."
+            eyebrow="03 · today's fight" title="Challenge & Quests"
+            subtitle="Daily challenge from Sage and rolling quests that refresh as you claim them."
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <AiChallengeCard />
               <Quests />
-              <Inventory />
             </div>
           </Section>
 

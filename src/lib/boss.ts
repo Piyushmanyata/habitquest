@@ -24,6 +24,24 @@ const ROSTER: Omit<Boss, 'id' | 'maxHp' | 'xpReward'>[] = [
   { name: 'Numbness Vortex',       emoji: '🕳️', flavor: 'eats the urge to start' },
   { name: 'Phone Phantom',         emoji: '📱', flavor: 'glows in the dark' },
   { name: 'Tomorrow Troll',        emoji: '🌙', flavor: 'promises a fresh start, forever' },
+  // ── Wave 2: dopamine + identity demons ─────────────────────────────────────
+  { name: 'Dopamine Dragon',       emoji: '🐲', flavor: 'hoards every quick hit' },
+  { name: 'Reels Banshee',         emoji: '📺', flavor: 'screams a 15-second song' },
+  { name: 'Burnout Behemoth',      emoji: '🦏', flavor: 'rewards hustle, then bills' },
+  { name: 'Overthinking Octopus',  emoji: '🐙', flavor: 'eight arms, zero action' },
+  { name: 'Self-Pity Slime',       emoji: '🟢', flavor: 'sticky, slow, contagious' },
+  { name: 'Perfectionism Phoenix', emoji: '🔥', flavor: 'demands the unmade masterpiece' },
+  { name: 'Caffeine Lich',         emoji: '☕', flavor: 'gives focus, takes sleep' },
+  { name: 'Insomnia Specter',      emoji: '🌃', flavor: 'haunts 2am scrolls' },
+  // ── Wave 3: deep boss tier ─────────────────────────────────────────────────
+  { name: 'Inner Critic Cyclops',  emoji: '👁️', flavor: 'one eye, all judgement' },
+  { name: 'Comfort Zone Sphinx',   emoji: '🦁', flavor: 'asks a riddle you keep solving safely' },
+  { name: 'Avoidance Mimic',       emoji: '🎭', flavor: 'wears the face of "productive"' },
+  { name: 'Regret Revenant',       emoji: '🪦', flavor: 'replays the unsent message' },
+  { name: 'Doubt Djinn',           emoji: '🌫️', flavor: 'grants three reasons to stop' },
+  { name: 'Scarcity Specter',      emoji: '⏳', flavor: 'whispers "not enough"' },
+  { name: 'Distraction Demogorgon',emoji: '🐙', flavor: 'opens a tab for every thought' },
+  { name: 'Identity Wyrm',         emoji: '🪱', flavor: 'asks "who are you, really?"' },
 ];
 
 const BASE_HP = 80;

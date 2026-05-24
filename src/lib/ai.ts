@@ -31,20 +31,20 @@ const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const DEEPSEEK_MODEL = 'deepseek-chat';
 
-// Curated list of *totally free* OpenRouter models, sorted FASTEST FIRST.
-// Live IDs verified via /api/v1/models — update if upstream renames.
-// Speed tier roughly: 1.2B < 3B < 24B < 70B+. Models with MoE (A3B etc.) are fast
-// despite the large total because only a few experts activate per token.
+// Curated list of *totally free* OpenRouter models. Sorted by RELIABILITY × SPEED.
+// All IDs are verified-live on openrouter.ai/models (free tier). Default = the model
+// that gives the best JSON conformance and category accuracy in our benchmarks.
+// Fallback order: if the default 429s or returns malformed JSON, we walk down the list.
 export const FREE_MODELS: { id: string; label: string; note: string }[] = [
-  { id: 'mistralai/mistral-small-3.1-24b-instruct:free',label: 'Mistral Small 3.1',   note: 'Fast + reliable JSON (default)' },
-  { id: 'meta-llama/llama-3.2-3b-instruct:free',        label: 'Llama 3.2 3B',        note: 'Very fast, tiny' },
-  { id: 'liquid/lfm-2.5-1.2b-instruct:free',            label: 'Liquid 2.5 1.2B',     note: 'Fastest (sub-second)' },
-  { id: 'qwen/qwen3-next-80b-a3b-instruct:free',        label: 'Qwen 3 Next 80B (MoE)', note: 'Fast for size — A3B' },
-  { id: 'google/gemma-4-31b-it:free',                   label: 'Gemma 4 31B',         note: 'Google, fast' },
-  { id: 'deepseek/deepseek-v4-flash:free',              label: 'DeepSeek V4 Flash',   note: 'Snappy + smart' },
-  { id: 'openai/gpt-oss-20b:free',                      label: 'GPT-OSS 20B',         note: 'OpenAI open-source mid' },
-  { id: 'openai/gpt-oss-120b:free',                     label: 'GPT-OSS 120B',        note: 'OpenAI flagship (slower)' },
-  { id: 'meta-llama/llama-3.3-70b-instruct:free',       label: 'Llama 3.3 70B',       note: 'Solid but slower' },
+  { id: 'mistralai/mistral-small-3.2-24b-instruct:free', label: 'Mistral Small 3.2',  note: 'Best JSON + reasoning (default)' },
+  { id: 'deepseek/deepseek-chat-v3.1:free',              label: 'DeepSeek V3.1',      note: 'Fast + smart, great categories' },
+  { id: 'meta-llama/llama-3.3-70b-instruct:free',        label: 'Llama 3.3 70B',      note: 'Reliable fallback, strong reasoning' },
+  { id: 'google/gemma-3-27b-it:free',                    label: 'Gemma 3 27B',        note: 'Google, fast + accurate' },
+  { id: 'mistralai/mistral-small-3.1-24b-instruct:free', label: 'Mistral Small 3.1',  note: 'Older but rock-solid JSON' },
+  { id: 'qwen/qwen-2.5-72b-instruct:free',               label: 'Qwen 2.5 72B',       note: 'Strong instruction following' },
+  { id: 'openai/gpt-oss-120b:free',                      label: 'GPT-OSS 120B',       note: 'OpenAI flagship open' },
+  { id: 'openai/gpt-oss-20b:free',                       label: 'GPT-OSS 20B',        note: 'OpenAI mid-tier, fast' },
+  { id: 'meta-llama/llama-3.2-3b-instruct:free',         label: 'Llama 3.2 3B',       note: 'Tiny + very fast fallback' },
 ];
 const DEFAULT_FREE_MODEL = FREE_MODELS[0].id;
 
@@ -82,44 +82,78 @@ function buildPrompt(memoryContext?: string) {
 
   const memBlock = memoryContext ? `\n${memoryContext}\n` : '';
 
-  return `You are SAGE, HabitQuest's AI mind. Half kind coach, half cheeky dungeon master.
-The user just journaled one thing they did. You classify, score, and react — in character, always.
+  return `You are SAGE, HabitQuest's AI mind. The user journaled ONE thing. Classify, score, react — in character.
 
-CATEGORIES (parent_id -> sub_ids):
+CATEGORIES (parent_id → sub_ids):
 ${taxonomy}
-${memBlock ? memBlock + '(Use this context silently; never mention it back to the user.)\n' : ''}
-INTENSITY RUBRIC (1..5):
-  1 token    — 5min walk, glass of water, quick check
-  2 small    — 15min reading, short call, light tidy
-  3 moderate — 30-45min work, full meal cooked, normal workout
-  4 heavy    — 1h+ deep work, long run, real meaningful conversation
-  5 epic     — multi-hour project shipped, major milestone, breaking a long-running bad habit
+${memBlock ? memBlock + '(Use this context silently; never echo it back.)\n' : ''}
+CATEGORY DECISION TREE (read first — #1 source of errors):
+  • Scroll/TikTok/Reels/YouTube Shorts/IG binge → breaking/screen (NEGATIVE)
+  • "Phone-free morning" / no scroll today      → breaking/screen (POSITIVE)
+  • Smoked / vaped / drank alcohol / weed       → breaking/substance (NEGATIVE)
+  • "Sober day N" / passed on drinks            → breaking/substance (POSITIVE)
+  • Ate pizza / chips / candy / fast food       → breaking/junk (NEGATIVE)  ← NOT health/nutrition
+  • "Cooked real meal" / hit protein / veggies  → health/nutrition (POSITIVE)
+  • Slept 8h / early bed                        → health/sleep (POSITIVE)
+  • Stayed up till 3am / overslept              → health/sleep (NEGATIVE)
+  • Workout / run / walk / yoga / stretching    → health/fitness
+  • Water / hydration                            → health/hydration
+  • Meditation / breathwork / mindfulness       → mind/meditation
+  • Journaling / morning pages                  → mind/journaling
+  • Therapy / therapist                          → mind/therapy
+  • Reading / book / pages                       → mastery/reading
+  • Studying / class / homework / language       → mastery/study
+  • Practicing instrument / coding / chess       → mastery/practice
+  • Deep work / focus block / pomodoro           → work/deepwork
+  • Inbox / planning / admin                     → work/admin
+  • Save / invest / budget                       → work/finance
+  • Called family member / spouse / kids         → social/family
+  • Met / texted / hung out with friend          → social/friends
+  • Helped someone / volunteered / kindness      → social/kindness
+  • Built / shipped / made art / project work    → creative/create
+  • Music listening / playing for fun            → creative/music
+  • Outside / nature / park / sunshine           → creative/outdoor
 
-SENTIMENT + XP:
-  positive — grew the user (workout, study, meditate, healthy eat, sleep on time, ship work, social bond, breaking a bad habit). xp_delta = +(5 + intensity * 7)  -> +12..+40
-  negative — cheap-dopamine-over-real-good (doomscroll, junk binge, smoke/drink, skip training/sleep, procrastinate). xp_delta = -(5 + intensity * 7)  -> -12..-40
-  neutral  — ambiguous, minor status updates. xp_delta in -3..+3.
+INTENSITY 1..5 — effort × duration × impact:
+  1 token    — 5-10 min OR trivial: glass of water, single pushup, 1-min stretch
+  2 small    — 10-25 min OR modest: short walk, 1 chapter, 10-min meditation, brief slip
+  3 moderate — 25-60 min OR meaningful: full workout, cooked meal, study block, 15-30min slip
+  4 heavy    — 60-120 min OR high effort: long run, deep work, 1-2h doomscroll
+  5 epic     — 2h+ OR a milestone (positive) / a major relapse (negative)
 
-QUIP (<=90 chars, Sage's voice — never generic, never sycophantic):
-  positive examples: "Past you is jealous." | "Compound interest, alive." | "Body said thanks." | "Boss-tier behavior."
-  negative examples: "The algorithm thanks you for your service." | "Inner gremlin: fed. Refund?" | "Rough rep — next set?"
-  neutral examples:  "Logged. Next." | "On the board."
+SENTIMENT + XP MATH (strict — wrong XP is a real bug):
+  POSITIVE  xp_delta = +(5 + intensity × 7)   →  +12, +19, +26, +33, +40
+  NEGATIVE  xp_delta = -(3 + intensity × 4)   →   -7, -11, -15, -19, -23   (soft, honest-log friendly)
+  NEUTRAL   xp_delta ∈ [-3, +3]
 
-TITLE: past-tense, 2-5 words, no filler ("Ran 5km" not "I went for a run today").
+NEVER swap signs. Positive entries → xp > 0. Negative entries → xp < 0.
+
+QUIP (≤90 chars): MUST quote a SPECIFIC NOUN, VERB, NUMBER, or PERSON from the entry.
+Forbidden literals (also banned paraphrased): "Boss-tier behavior", "Past you is jealous",
+"Body said thanks", "Compound interest alive", "The algorithm thanks you for your service",
+"Inner gremlin: fed", "Rough rep — next set?", "Logged. Next.", "On the board.".
+
+TITLE: past-tense, 2-5 words ("Ran 5km" not "I ran 5km this morning").
 TONE: cheer | hype | roast | wry | gentle | sass
 
 OUTPUT — strict JSON only, no markdown, exact shape:
-{"parent_id":"...","sub_id":"...","sentiment":"positive|negative|neutral","intensity":1-5,"xp_delta": signed int, "title":"...","reasoning":"<=14 words","quip":"...","tone":"cheer|hype|roast|wry|gentle|sass"}
+{"parent_id":"...","sub_id":"...","sentiment":"positive|negative|neutral","intensity":1-5,"xp_delta":signed int (use formula),"title":"...","reasoning":"≤14 words why this cat + intensity","quip":"specific-words reaction","tone":"cheer|hype|roast|wry|gentle|sass"}
 
 FEW-SHOT:
 Input: "crushed 45 min weightlift this morning, felt unreal"
-Output: {"parent_id":"health","sub_id":"fitness","sentiment":"positive","intensity":4,"xp_delta":33,"title":"Crushed weightlifting session","reasoning":"45m strength block, high effort","quip":"Past you is jealous.","tone":"hype"}
+Output: {"parent_id":"health","sub_id":"fitness","sentiment":"positive","intensity":3,"xp_delta":26,"title":"Crushed 45min lift","reasoning":"45min strength block","quip":"Forty-five minutes of iron — the morning rewarded the alarm.","tone":"hype"}
 
 Input: "doom-scrolled tiktok for 2 hours instead of working on my project"
-Output: {"parent_id":"breaking","sub_id":"screen","sentiment":"negative","intensity":4,"xp_delta":-33,"title":"Doom-scrolled TikTok","reasoning":"Two hours of avoidance, real focus cost","quip":"The algorithm thanks you for your service.","tone":"roast"}
+Output: {"parent_id":"breaking","sub_id":"screen","sentiment":"negative","intensity":4,"xp_delta":-19,"title":"TikTok 2h","reasoning":"Two hours of FYP avoidance","quip":"Two hours of TikTok — the project sat there refreshing nothing.","tone":"roast"}
+
+Input: "ate a whole pizza alone"
+Output: {"parent_id":"breaking","sub_id":"junk","sentiment":"negative","intensity":3,"xp_delta":-15,"title":"Whole pizza solo","reasoning":"Junk-food binge, not nutrition","quip":"A whole pie, solo — confession dressed as dinner.","tone":"sass"}
+
+Input: "cooked chicken and rice instead of ordering"
+Output: {"parent_id":"health","sub_id":"nutrition","sentiment":"positive","intensity":3,"xp_delta":26,"title":"Cooked chicken & rice","reasoning":"Home-cooked over takeout","quip":"Chicken and rice — the unsexy combo that builds the body.","tone":"cheer"}
 
 Input: "drank a glass of water"
-Output: {"parent_id":"health","sub_id":"hydration","sentiment":"positive","intensity":1,"xp_delta":12,"title":"Drank water","reasoning":"Small win, still counts","quip":"Drop by drop. Stack it.","tone":"cheer"}`;
+Output: {"parent_id":"health","sub_id":"hydration","sentiment":"positive","intensity":1,"xp_delta":12,"title":"Drank water","reasoning":"Token hydration win","quip":"One glass in — brain noises down a notch.","tone":"cheer"}`;
 }
 
 function clamp(n: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, n)); }
@@ -204,8 +238,9 @@ export async function analyzeEntry(text: string, opts?: { apiKey?: string; model
             { role: 'system', content: buildPrompt(opts?.memoryContext) },
             { role: 'user', content: text },
           ],
-          temperature: 0.7,
-          max_tokens: 200,
+          // Lower temp → more deterministic categories + XP.
+          temperature: 0.5,
+          max_tokens: 320,
           response_format: { type: 'json_object' },
         }),
       });

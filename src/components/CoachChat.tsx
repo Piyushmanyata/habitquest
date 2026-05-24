@@ -36,17 +36,20 @@ export default function CoachChat() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [history, sending]);
 
-  async function submit() {
-    const t = text.trim();
+  // Accepts an optional explicit message so suggestion-clicks can bypass React state
+  // (setText is async — relying on `text` here would send the previous value).
+  async function submit(explicit?: string) {
+    const t = (explicit ?? text).trim();
     if (!t || sending) return;
     setText('');
     setSending(true);
     try { await send(t); } finally { setSending(false); taRef.current?.focus(); }
   }
 
+  // Clicking a starter chip auto-fires the question.
   function pick(s: string) {
-    setText(s);
-    requestAnimationFrame(() => taRef.current?.focus());
+    if (sending) return;
+    submit(s);
   }
 
   return (
@@ -168,7 +171,7 @@ export default function CoachChat() {
           )}
         </div>
         <button
-          onClick={submit}
+          onClick={() => submit()}
           disabled={!text.trim() || !apiKey || sending}
           className="p-2.5 rounded-lg bg-[var(--accent)] text-[#0a0a0b] disabled:opacity-30 disabled:cursor-not-allowed hover:brightness-110 transition shrink-0"
           title="Send (Enter)"

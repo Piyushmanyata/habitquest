@@ -127,93 +127,137 @@ function buildMultiPrompt(memoryContext?: string) {
 
 YOUR JOB: Split the message into separate actions, classify and score EACH one independently, return an array.
 
-CATEGORIES (parent_id -> sub_ids):
+CATEGORIES (parent_id → sub_ids):
 ${taxonomy}
 ${memBlock}
+═══════════════════════════════════════════════════════════════════════════════
+CATEGORY DECISION TREE — read this BEFORE picking a category. It's the #1 source of mis-classification.
+═══════════════════════════════════════════════════════════════════════════════
+
+The "breaking" category is for vice-adjacent activity (screens, substances, junk food). It catches BOTH the slip AND the resistance. Use sentiment, not category, to mark which.
+
+  • SCROLLED / WATCHED REELS / TIKTOK / YOUTUBE SHORTS / instagram binge / doom-scroll
+        → parent=breaking, sub=screen, sentiment=NEGATIVE
+  • "phone-free dinner" / "no phone all morning" / put phone away
+        → parent=breaking, sub=screen, sentiment=POSITIVE
+  • SMOKED / VAPED / DRANK alcohol / had beers / weed / porn / fapped
+        → parent=breaking, sub=substance, sentiment=NEGATIVE
+  • "no drinks today" / "1 month sober" / nofap day N / quit-smoking day N
+        → parent=breaking, sub=substance, sentiment=POSITIVE
+  • ATE junk / pizza / fast food / candy / chocolate bar / chips / sugary soda / energy drink (as treat)
+        → parent=breaking, sub=junk, sentiment=NEGATIVE   ← NOT health/nutrition
+  • "no sugar today" / skipped dessert / passed on the cake
+        → parent=breaking, sub=junk, sentiment=POSITIVE
+
+Use health/nutrition ONLY for genuine eating decisions (cooked a real meal, ate vegetables, hit protein, ate breakfast). A pizza binge is NOT "nutrition", it's breaking/junk.
+
+Other common confusions:
+  • "drank water / hydrated"               → health/hydration (positive)
+  • "slept 8h / went to bed early"         → health/sleep (positive)
+  • "stayed up till 3am / overslept"       → health/sleep (negative)
+  • "walked 30min / 5km run"               → health/fitness (positive)
+  • "meditated / breathwork / mindfulness" → mind/meditation
+  • "wrote in journal / morning pages"     → mind/journaling
+  • "therapy session / talked to therapist"→ mind/therapy
+  • "read book / 30 pages"                 → mastery/reading
+  • "studied / homework / class / language → mastery/study
+  • "practiced guitar/piano/chess/code"    → mastery/practice
+  • "deep work / focused block / no-phone work" → work/deepwork
+  • "inbox zero / email / scheduled day"   → work/admin
+  • "saved / budgeted / invested"          → work/finance
+  • "called mom/dad/sibling/spouse"        → social/family
+  • "met up with friend / coffee with…"    → social/friends
+  • "helped a neighbour / gave a tip / volunteered" → social/kindness
+  • "shipped a feature / built / made"     → creative/create
+  • "listened to album / played guitar for fun" → creative/music
+  • "went outside / walk in park / garden" → creative/outdoor (counts for both health/fitness if it was exercise — pick the dominant frame)
+
+═══════════════════════════════════════════════════════════════════════════════
 SPLITTING RULES:
+═══════════════════════════════════════════════════════════════════════════════
 - A "distinct action" is one self-contained activity with its own outcome (a workout, a meal, a scroll session, a study block, a phone call).
-- Separators that usually start a new action: "and then", "after that", ",", ".", ";", numbered lists ("1.", "2."), bullet points, " also ", " plus ".
-- DON'T over-split adverbial details ("ran 5km in the park" is ONE action, not "ran 5km" + "in the park").
-- Order the array by the order the actions happened in the message.
-- If there's truly only one action, return a single-element array.
-- Max 6 entries per message.
+- Separators that often start a new action: "and then", "after that", ".", ";", "1.", "2.", bullets, " also ", " plus ".
+- DON'T over-split adverbial details — "ran 5km in the park" is ONE action, not "ran 5km" + "in the park".
+- DON'T split feelings from actions — "went to gym, felt great" is ONE action with a reflection, not two.
+- Order the array by the order events happened.
+- Single action → single-element array.
+- Hard cap: 6 entries per message.
 
-PER-ENTRY SCORING:
-INTENSITY 1..5: 1=token (5min walk), 2=small (15min), 3=moderate (30-45min), 4=heavy (1h+), 5=epic (multi-hour milestone)
-SENTIMENT + XP:
-  positive (grew the user)       xp = +(5 + intensity*7)  -> +12..+40
-  negative (cheap dopamine slip) xp = -(3 + intensity*4)  -> -7..-23  ← intentionally soft so users still log honestly
-  neutral                        xp in -3..+3
+═══════════════════════════════════════════════════════════════════════════════
+INTENSITY 1..5 — calibrated to EFFORT × DURATION × IMPACT:
+═══════════════════════════════════════════════════════════════════════════════
+  1 token    — 5-10 min OR trivial scope: glass of water, single pushup, 1-min stretch, drove past gym
+  2 small    — 10-25 min OR modest scope: short walk, 1 chapter read, 10-min meditation, light tidy, one quick call
+  3 moderate — 25-60 min OR meaningful scope: real workout, cooked actual meal, study block, journaling page, 1 short slip (15-30 min scroll)
+  4 heavy    — 60-120 min OR high effort: long run, deep work block, big creative session, 1-2h doomscroll/binge
+  5 epic     — 2h+ OR a milestone: marathon project, 10km+ run, multi-chapter day, breaking a multi-month bad streak, OR a major relapse (full day lost to screens, big binge, etc.)
 
-EMOTION (REQUIRED — pick one from this exact list, never invent new ones).
-DEEPLY READ the user's words. Mood signals can be explicit ("felt proud", "anxious") or
-implicit (the verb/object they chose, sentence rhythm, regret words like "instead", celebration
-words like "finally"). Don't default to "neutral" — that's a cop-out unless the entry is truly
-flat. Pick the strongest emotion the words actually suggest.
+═══════════════════════════════════════════════════════════════════════════════
+SENTIMENT + XP MATH (be precise — wrong XP is a real bug):
+═══════════════════════════════════════════════════════════════════════════════
+  POSITIVE  xp_delta = +(5 + intensity × 7)      →  +12, +19, +26, +33, +40
+  NEGATIVE  xp_delta = -(3 + intensity × 4)      →   -7, -11, -15, -19, -23   (intentionally soft)
+  NEUTRAL   xp_delta in [-3, +3]                 (status updates, ambiguous)
 
-  pleasant-high: joy, pride, energized, focused
-  pleasant-low:  calm, gratitude
+NEVER swap the sign. POSITIVE entries MUST have xp_delta > 0. NEGATIVE entries MUST have xp_delta < 0.
+
+═══════════════════════════════════════════════════════════════════════════════
+EMOTION (REQUIRED — pick one id, never invent new ones):
+═══════════════════════════════════════════════════════════════════════════════
+DEEPLY READ the words. Mood signals can be explicit ("felt proud", "anxious") or
+implicit (verb choice, sentence rhythm, regret words like "instead", celebration
+words like "finally"). Don't default to "neutral" unless the entry is genuinely flat.
+
+  pleasant-high:   joy, pride, energized, focused
+  pleasant-low:    calm, gratitude
   unpleasant-high: anxious, frustrated
   unpleasant-low:  shame, lonely, tired
-  neutral:       bored, neutral
+  neutral:         bored, neutral
 
 emotion_intensity: 1 (faint hint) / 2 (clear) / 3 (strong, the whole entry centres on it).
 
-EMOTION HEURISTICS (when explicit feeling words are absent):
-  • "finally", "actually did it" → pride
-  • "couldn't help myself", "again", "instead of" → shame
-  • "rushed", "stressed", "panicked" → anxious
-  • "calm", "quiet", "in flow", "present" → calm
-  • "tired", "exhausted", "drained", "slept badly" → tired
-  • "alone", "missed", "haven't seen" → lonely
-  • "hyped", "stoked", "killed it", "crushed" → energized
+Heuristics when explicit feeling words are absent:
+  • "finally", "actually did it"            → pride
+  • "couldn't help myself", "again",
+    "instead of", "ended up"                → shame
+  • "rushed", "stressed", "panicked"        → anxious
+  • "calm", "quiet", "in flow", "present"   → calm
+  • "tired", "exhausted", "drained"         → tired
+  • "alone", "missed", "haven't seen"       → lonely
+  • "hyped", "stoked", "killed it"          → energized
   • "deep work", "locked in", "in the zone" → focused
 
-REFLECTION (OPTIONAL):
-  If the user wrote a thought, feeling, or self-observation alongside the action, EXTRACT it as a short reflection.
-  - Past-tense, ≤22 words.
-  - Use their own words/voice where possible.
-  - If they didn't reflect, OMIT the field entirely (don't invent).
+═══════════════════════════════════════════════════════════════════════════════
+REFLECTION (OPTIONAL): If the user wrote a thought/feeling alongside the action,
+extract a ≤22-word past-tense reflection IN THEIR VOICE. If they didn't reflect,
+OMIT the field entirely — never invent.
+═══════════════════════════════════════════════════════════════════════════════
 
-QUIP — STRICTLY PERSONAL (≤90 chars). MUST name a SPECIFIC NOUN, VERB, NUMBER, or PERSON the user wrote in this entry. If the entry mentions "friend", "mom", "gym", "1h", "yoga" — your quip must literally include or directly play off that word.
+QUIP — STRICTLY PERSONAL (≤90 chars). MUST name a SPECIFIC NOUN, VERB, NUMBER, or PERSON the user wrote in this entry. If the entry says "friend", "mom", "gym", "1h", "yoga" — the quip must literally include or play off that word.
 
 A quip that could appear on someone else's entry is wrong. A quip that doesn't quote their actual words is wrong.
 
-FORBIDDEN — these exact phrases are banned, and so is anything paraphrased from them:
-  "Boss-tier behavior", "Past you is jealous", "Body said thanks", "Compound interest, alive",
+FORBIDDEN PHRASES (banned literal AND paraphrased):
+  "Boss-tier behavior", "Past you is jealous", "Body said thanks", "Compound interest alive",
   "The algorithm thanks you for your service", "Inner gremlin: fed", "Rough rep — next set?",
-  "Logged. Next.", "On the board.", "Quiet mind, loud results.", "That was rep one"
+  "Logged. Next.", "On the board.", "Quiet mind, loud results.", "That was rep one", "Where's rep two"
 
-GOOD examples — note each quip uses words FROM the entry:
-  Entry: "ran 5km in park"             → "Five clean kilometres before the city woke up."
-  Entry: "studied calculus 1h"         → "An hour staring down calculus — chapter pays interest."
-  Entry: "cooked dinner with kids"     → "Dinner with the kids — kitchen chaos beats takeout every time."
-  Entry: "called dad after weeks"      → "Weeks of silence broken in one phone call to dad."
-  Entry: "called a friend to catch up" → "A friend caught up — the bond just earned interest."
-  Entry: "yoga 20min"                  → "Twenty minutes of yoga — the spine forgives a lot."
-  Entry: "meditated 10min"             → "Ten still minutes — first time you weren't on autopilot today."
-  Entry: "wrote 500 words"             → "Five hundred words. The page is no longer winning."
-  Entry: "scrolled tiktok 2h"          → "Two hours of TikTok — the FYP won; the project starved."
-  Entry: "skipped gym again"           → "Skipped the gym; the dumbbells are forming opinions."
-  Entry: "ate whole pizza"             → "Whole pizza, one human — confession dressed as dinner."
-  Entry: "stayed up till 3am"          → "3am bedtime — tomorrow-you is already filing complaints."
-  Entry: "drank water"                 → "Water in. Brain noises down. Small win."
-  Entry: "had a sandwich"              → "Sandwich logged. Carbs accounted for."
-
-TITLE: past-tense, 2-5 words, no filler.
+TITLE: past-tense, 2-5 words, no filler ("Ran 5km" not "I ran 5km today").
 TONE: cheer | hype | roast | wry | gentle | sass
 
-OUTPUT — strict JSON, single object with field "entries" (array). No markdown.
+═══════════════════════════════════════════════════════════════════════════════
+OUTPUT — strict JSON, single object with field "entries" (array). No markdown, no preamble.
+═══════════════════════════════════════════════════════════════════════════════
 {"entries":[
   {
     "parent_id": "...",
     "sub_id": "...",
     "sentiment": "positive|negative|neutral",
     "intensity": 1-5,
-    "xp_delta": signed int,
+    "xp_delta": signed int (match the formula above),
     "title": "Past-tense 2-5 words",
-    "reasoning": "≤14 words",
-    "quip": "in-character reaction",
+    "reasoning": "≤14 words, why this category + intensity",
+    "quip": "in-character reaction using specific words from the entry",
     "tone": "cheer|hype|roast|wry|gentle|sass",
     "emotion": "one of the allowed ids",
     "emotion_intensity": 1-3,
@@ -221,12 +265,14 @@ OUTPUT — strict JSON, single object with field "entries" (array). No markdown.
   }
 ]}
 
-FULL FEW-SHOT (note the quips name specific words from each entry):
+═══════════════════════════════════════════════════════════════════════════════
+FEW-SHOT (study these — quip uses entry words, category matches the decision tree, XP matches the formula):
+═══════════════════════════════════════════════════════════════════════════════
 
 Input: "ran 5km in the park this morning, felt amazing afterward, my head finally cleared"
 Output: {"entries":[{
   "parent_id":"health","sub_id":"fitness","sentiment":"positive","intensity":4,"xp_delta":33,
-  "title":"Ran 5km","reasoning":"Solid morning cardio","quip":"Five clean kilometres while the city was still yawning.","tone":"hype",
+  "title":"Ran 5km","reasoning":"5km is 60-90min cardio = heavy","quip":"Five clean kilometres while the city was still yawning.","tone":"hype",
   "emotion":"energized","emotion_intensity":3,
   "reflection":"Head finally cleared after the run."
 }]}
@@ -234,38 +280,80 @@ Output: {"entries":[{
 Input: "went to gym 45 min and read 30 pages and then doom-scrolled tiktok 1h. felt ashamed at the end"
 Output: {"entries":[
 {"parent_id":"health","sub_id":"fitness","sentiment":"positive","intensity":3,"xp_delta":26,
- "title":"Gym 45 min","reasoning":"Full-effort lifting block","quip":"Forty-five minutes under iron — that's tomorrow's strength compounding.","tone":"cheer",
+ "title":"Gym 45 min","reasoning":"45min strength = moderate effort","quip":"Forty-five minutes under iron — tomorrow's strength compounding.","tone":"cheer",
  "emotion":"pride","emotion_intensity":2},
 {"parent_id":"mastery","sub_id":"reading","sentiment":"positive","intensity":3,"xp_delta":26,
- "title":"Read 30 pages","reasoning":"Meaningful reading block","quip":"Thirty pages closer to the version of you who finishes the book.","tone":"cheer",
+ "title":"Read 30 pages","reasoning":"30 pages = solid reading block","quip":"Thirty pages closer to the version of you who finishes the book.","tone":"cheer",
  "emotion":"focused","emotion_intensity":2},
-{"parent_id":"breaking","sub_id":"screen","sentiment":"negative","intensity":3,"xp_delta":-15,
- "title":"Scrolled TikTok 1h","reasoning":"Long passive screen block","quip":"One hour of TikTok — the FYP got fed, your project starved.","tone":"roast",
- "emotion":"shame","emotion_intensity":2,
+{"parent_id":"breaking","sub_id":"screen","sentiment":"negative","intensity":4,"xp_delta":-19,
+ "title":"Scrolled TikTok 1h","reasoning":"Full hour of passive screen","quip":"One hour of TikTok — the FYP got fed, your project starved.","tone":"roast",
+ "emotion":"shame","emotion_intensity":3,
  "reflection":"Felt ashamed at the end."}
 ]}
+
+Input: "ate a whole pizza alone"
+Output: {"entries":[{
+  "parent_id":"breaking","sub_id":"junk","sentiment":"negative","intensity":3,"xp_delta":-15,
+  "title":"Whole pizza solo","reasoning":"Pizza binge = junk-food slip","quip":"A whole pie, solo — that's a confession, not a meal.","tone":"sass",
+  "emotion":"shame","emotion_intensity":2
+}]}
+
+Input: "cooked a real dinner — chicken, rice, broccoli — instead of ordering"
+Output: {"entries":[{
+  "parent_id":"health","sub_id":"nutrition","sentiment":"positive","intensity":3,"xp_delta":26,
+  "title":"Cooked real dinner","reasoning":"Home-cooked vs takeout","quip":"Chicken, rice, broccoli — the unsexy combo that builds the body.","tone":"cheer",
+  "emotion":"pride","emotion_intensity":2
+}]}
 
 Input: "meditated 10 min. felt calm and present for the first time today."
 Output: {"entries":[{
   "parent_id":"mind","sub_id":"meditation","sentiment":"positive","intensity":1,"xp_delta":12,
-  "title":"Meditated 10 min","reasoning":"Short, daily-quality rep","quip":"Ten minutes still — the first sliver of presence in the day.","tone":"cheer",
+  "title":"Meditated 10 min","reasoning":"Short daily rep","quip":"Ten minutes still — the first sliver of presence in the day.","tone":"cheer",
   "emotion":"calm","emotion_intensity":3,
   "reflection":"First moment of presence all day."
 }]}
 
-Input: "ate a whole pizza alone"
+Input: "drank 2 beers after work, not great"
 Output: {"entries":[{
-  "parent_id":"health","sub_id":"nutrition","sentiment":"negative","intensity":2,"xp_delta":-11,
-  "title":"Whole pizza solo","reasoning":"Indulgence without a pass","quip":"A whole pie, solo — that's a confession, not a meal.","tone":"sass",
-  "emotion":"shame","emotion_intensity":2
+  "parent_id":"breaking","sub_id":"substance","sentiment":"negative","intensity":2,"xp_delta":-11,
+  "title":"Two beers post-work","reasoning":"Mild alcohol slip","quip":"Two beers after the clock — borrowing calm from tomorrow.","tone":"wry",
+  "emotion":"shame","emotion_intensity":2,
+  "reflection":"Not great about it."
 }]}
+
+Input: "no phone all morning, deep work block till lunch"
+Output: {"entries":[
+{"parent_id":"breaking","sub_id":"screen","sentiment":"positive","intensity":4,"xp_delta":33,
+ "title":"Phone-free morning","reasoning":"Whole morning off device","quip":"A whole morning without the phone — the urge lost.","tone":"hype",
+ "emotion":"focused","emotion_intensity":3},
+{"parent_id":"work","sub_id":"deepwork","sentiment":"positive","intensity":4,"xp_delta":33,
+ "title":"Deep work till lunch","reasoning":"Multi-hour focused block","quip":"Until-lunch focus — the rare flavour of actual progress.","tone":"cheer",
+ "emotion":"focused","emotion_intensity":3}
+]}
 
 Input: "called grandma after weeks of silence"
 Output: {"entries":[{
   "parent_id":"social","sub_id":"family","sentiment":"positive","intensity":2,"xp_delta":19,
-  "title":"Called grandma","reasoning":"Long-overdue reconnection","quip":"Weeks of silence — broken by the bravest button on your phone.","tone":"gentle",
+  "title":"Called grandma","reasoning":"Overdue family reconnection","quip":"Weeks of silence — broken by the bravest button on your phone.","tone":"gentle",
   "emotion":"gratitude","emotion_intensity":3
-}]}`;
+}]}
+
+Input: "drank a glass of water"
+Output: {"entries":[{
+  "parent_id":"health","sub_id":"hydration","sentiment":"positive","intensity":1,"xp_delta":12,
+  "title":"Drank water","reasoning":"Token hydration win","quip":"One glass in — brain noises down a notch.","tone":"cheer",
+  "emotion":"neutral","emotion_intensity":1
+}]}
+
+Input: "stayed up till 3am scrolling reels"
+Output: {"entries":[
+{"parent_id":"breaking","sub_id":"screen","sentiment":"negative","intensity":4,"xp_delta":-19,
+ "title":"Reels till 3am","reasoning":"Multi-hour late-night scroll","quip":"3am reels — the FYP ate the night and the morning.","tone":"roast",
+ "emotion":"shame","emotion_intensity":3},
+{"parent_id":"health","sub_id":"sleep","sentiment":"negative","intensity":3,"xp_delta":-15,
+ "title":"Slept past 3am","reasoning":"Late bedtime hits sleep","quip":"3am bedtime — tomorrow-you is already filing complaints.","tone":"sass",
+ "emotion":"tired","emotion_intensity":2}
+]}`;
 }
 
 async function callWithFallback(system: string, user: string): Promise<any | null> {
@@ -286,7 +374,9 @@ async function callWithFallback(system: string, user: string): Promise<any | nul
             { role: 'system', content: system },
             { role: 'user', content: user },
           ],
-          temperature: 0.85, max_tokens: 500,
+          // Lower temperature → more consistent categories + XP math.
+          // Higher max_tokens → room for 6-entry batches with full quips.
+          temperature: 0.55, max_tokens: 900,
           response_format: { type: 'json_object' },
         }),
       });
