@@ -83,7 +83,7 @@ export default function App() {
     <div className="min-h-screen px-5 md:px-6 py-5 md:py-7 max-w-7xl mx-auto">
       <TopBar onOpenSettings={() => setSettingsOpen(true)} onOpenRecap={() => setRecapOpen(true)} />
 
-      <div className="flex items-center gap-1 mb-5 flex-wrap overflow-x-auto pb-1">
+      <div className="flex items-center gap-1 mb-5 flex-wrap pb-1 max-w-full">
         <TabBtn name="home"      active={tab === 'home'}      onClick={() => setTab('home')}      kbd="1" />
         <TabBtn name="logs"      active={tab === 'logs'}      onClick={() => setTab('logs')}      kbd="2" />
         <TabBtn name="codex"     active={tab === 'analytics'} onClick={() => setTab('analytics')} kbd="3" />
