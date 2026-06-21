@@ -1,7 +1,7 @@
 // Journal-style store with combo system, AI quips, multipliers, and more game-feel.
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { analyzeEntry, EntryAnalysis, ReactionTone } from '../lib/ai';
+import { EntryAnalysis, ReactionTone } from '../lib/ai';
 import { analyzeMultiEntries, splitForHeuristic } from '../lib/aiMulti';
 import { suggestQuestFromRecent } from '../lib/aiQuests';
 import { heuristicAnalyze } from '../lib/heuristic';
@@ -18,6 +18,7 @@ import { Boss, bossForDay, damageFor } from '../lib/boss';
 import { deriveMemory, memoryAsPrompt, UserMemory } from '../lib/memory';
 import { ITEM_BY_ID, ShopItem, SHOP_ITEMS } from '../lib/shop';
 import { priceCustomItem, generateDailyChallenge, generateWisdom, AiChallenge } from '../lib/aiExtras';
+import { reverseRewardDelta } from '../lib/rewardLedger';
 
 export type Entry = {
   id: string;
@@ -56,6 +57,19 @@ type LastChange = { delta: number; at: number; sentiment: Entry['sentiment']; co
 type LastLoot = { item: LootItem; at: number } | null;
 type BossState = { day: string; bossIndex: number; hpLeft: number; defeated: boolean; defeatedAt?: number };
 type Inventory = { focus: number; crit: number; freeze: number };
+type InventoryDelta = Partial<Inventory>;
+type RewardLedgerEntry = {
+  at: number;
+  xpDelta: number;
+  goldDelta: number;
+  bossDamage: number;
+  bossDefeated: boolean;
+  bossDefeatedAt?: number;
+  trophyExpiresAt?: number;
+  loot?: LootItem | null;
+  inventoryDelta: InventoryDelta;
+  freezeUsedDays: string[];
+};
 type ActiveBuffs = { focus: boolean; crit: boolean };
 
 type State = {
@@ -66,11 +80,13 @@ type State = {
   questsCompletedTotal: number;
   lastChange: LastChange;
   lastLoot: LastLoot;
+  rewardLedger: Record<string, RewardLedgerEntry>;
   apiKey: string;
   combo: number;
   comboBest: number;
   comboExpiresAt: number;
   inventory: Inventory;
+  streakFreezeDays: string[];
   passes: Record<string, number>;     // passId → count
   buffs: ActiveBuffs;
   boss: BossState | null;
@@ -103,7 +119,7 @@ type State = {
   currentStreak: () => number;
   unlockedBadges: () => string[];
   comboMultiplier: () => number;
-  useItem: (kind: 'focus' | 'crit') => void;
+  useItem: (kind: 'focus' | 'crit' | 'freeze') => void;
   todaysBoss: () => Boss & { hpLeft: number; defeated: boolean; bossIndex: number };
 
   // shop + memory + check-in
@@ -161,6 +177,94 @@ function spawnNextBoss(prev: BossState): BossState & { name: string; emoji: stri
            name: def.name, emoji: def.emoji, flavor: def.flavor, maxHp: def.maxHp, xpReward: def.xpReward };
 }
 
+function previousDayKey(key: string): string {
+  const d = new Date(key + 'T00:00:00');
+  d.setDate(d.getDate() - 1);
+  return dayKey(d);
+}
+
+function nextDayKey(key: string): string {
+  const d = new Date(key + 'T00:00:00');
+  d.setDate(d.getDate() + 1);
+  return dayKey(d);
+}
+
+export function rebuildFreezeLedger(entries: Entry[], currentDays: string[], freezeBudget: number): { days: string[]; remaining: number } {
+  const frozen = new Set(currentDays);
+  const positives = new Set(entries.filter(e => e.sentiment === 'positive').map(e => e.dayKey));
+  const seenDays = new Set(entries.map(e => e.dayKey));
+  let cursor = dayKey();
+  let walkedBack = false;
+  let started = false;
+  const maxLookback = 3650;
+
+  for (let steps = 0; steps < maxLookback; steps++) {
+    const ok = positives.has(cursor) || frozen.has(cursor);
+    if (ok) {
+      started = true;
+      cursor = previousDayKey(cursor);
+      continue;
+    }
+
+    if (freezeBudget > 0) {
+      frozen.add(cursor);
+      freezeBudget -= 1;
+      started = true;
+      cursor = previousDayKey(cursor);
+      continue;
+    }
+
+    if (!started && !walkedBack) {
+      walkedBack = true;
+      cursor = previousDayKey(cursor);
+      continue;
+    }
+
+    if (!seenDays.has(cursor)) break;
+    cursor = previousDayKey(cursor);
+  }
+
+  return { days: [...frozen].sort(), remaining: freezeBudget };
+}
+
+function rebuildBossFromLedger(entries: Entry[], ledger: Record<string, RewardLedgerEntry>): BossState | null {
+  const today = dayKey();
+  const todayEntries = entries
+    .filter(e => e.dayKey === today)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  if (!todayEntries.length) return null;
+
+  let boss = ensureBoss(null);
+  for (const entry of todayEntries) {
+    const reward = ledger[entry.id];
+    if (!reward || entry.sentiment !== 'positive' || reward.bossDamage <= 0) continue;
+    boss = { ...boss, hpLeft: Math.max(0, boss.hpLeft - reward.bossDamage) };
+    if (boss.hpLeft <= 0 && !boss.defeated) {
+      boss = { ...boss, defeated: true, defeatedAt: reward.bossDefeatedAt ?? reward.at };
+      boss = spawnNextBoss(boss);
+    }
+  }
+  return boss;
+}
+
+function rebuildLoot(entries: Entry[], ledger: Record<string, RewardLedgerEntry>): LastLoot {
+  const reward = [...entries]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .map(e => ledger[e.id])
+    .find(r => !!r?.loot);
+  return reward?.loot ? { item: reward.loot, at: reward.at } : null;
+}
+
+function rebuildTrophy(entries: Entry[], ledger: Record<string, RewardLedgerEntry>): State['trophy'] {
+  const trophies = entries
+    .map(e => ledger[e.id])
+    .filter((r): r is RewardLedgerEntry => !!r?.trophyExpiresAt)
+    .sort((a, b) => (b.trophyExpiresAt ?? 0) - (a.trophyExpiresAt ?? 0));
+  const trophy = trophies[0];
+  if (!trophy || (trophy.trophyExpiresAt ?? 0) <= Date.now()) return null;
+  return { expiresAt: trophy.trophyExpiresAt! };
+}
+
 function multiplierFor(combo: number) {
   if (combo >= 6) return 3;
   if (combo >= 4) return 2.25;
@@ -210,9 +314,10 @@ function recomputeQuestProgress(q: Quest, entries: Entry[], today: string, combo
   return { ...q, progress, completed: progress >= q.target };
 }
 
-function computeStreak(entries: Entry[]): number {
+export function computeStreak(entries: Entry[], frozenDays: string[] = []): number {
   const byDay: Record<string, number> = {};
   const positives: Record<string, number> = {};
+  const frozen = new Set(frozenDays);
   for (const e of entries) {
     byDay[e.dayKey] = (byDay[e.dayKey] || 0) + e.xpDelta;
     if (e.sentiment === 'positive') positives[e.dayKey] = (positives[e.dayKey] || 0) + 1;
@@ -223,15 +328,13 @@ function computeStreak(entries: Entry[]): number {
   let streak = 0;
   let walkedBack = false;
   for (;;) {
-    const ok = (positives[cursor] || 0) >= 1 && (byDay[cursor] ?? 0) >= 0;
+    const ok = frozen.has(cursor) || ((positives[cursor] || 0) >= 1 && (byDay[cursor] ?? 0) >= 0);
     if (ok) {
       streak++;
-      const d = new Date(cursor + 'T00:00:00'); d.setDate(d.getDate() - 1);
-      cursor = dayKey(d);
+      cursor = previousDayKey(cursor);
     } else if (streak === 0 && !walkedBack) {
       walkedBack = true;
-      const d = new Date(cursor + 'T00:00:00'); d.setDate(d.getDate() - 1);
-      cursor = dayKey(d);
+      cursor = previousDayKey(cursor);
     } else break;
     if (streak > 3650) break;
   }
@@ -323,11 +426,16 @@ function applyOneEntry(quick: EntryAnalysis, batchId: string, get: any, set: any
     let boss = ensureBoss(s.boss);
     let trophy = s.trophy;
     let bossesDefeated = s.profile.bossesDefeated;
+    let bossDamage = 0;
+    let bossDefeatedNow = false;
+    let bossDefeatedAt: number | undefined;
     if (entry.sentiment === 'positive') {
-      const dmg = Math.round(damageFor(entry.intensity, mult) * gear.bossDamageMultiplier);
-      boss = { ...boss, hpLeft: Math.max(0, boss.hpLeft - dmg) };
+      bossDamage = Math.round(damageFor(entry.intensity, mult) * gear.bossDamageMultiplier);
+      boss = { ...boss, hpLeft: Math.max(0, boss.hpLeft - bossDamage) };
       if (boss.hpLeft <= 0 && !boss.defeated) {
         boss = { ...boss, defeated: true, defeatedAt: Date.now() };
+        bossDefeatedNow = true;
+        bossDefeatedAt = Date.now();
       }
     }
     let finalXp = xp;
@@ -359,7 +467,8 @@ function applyOneEntry(quick: EntryAnalysis, batchId: string, get: any, set: any
       finalXp += boss.xpReward;
       goldGain += Math.round(boss.xpReward * 0.5);
       bossesDefeated += 1;
-      trophy = { expiresAt: Date.now() + 24 * 60 * 60 * 1000 };
+      const trophyExpiresAt = Date.now() + 24 * 60 * 60 * 1000;
+      trophy = { expiresAt: trophyExpiresAt };
       // Spawn the next boss in today's chain immediately — escalation continues.
       boss = spawnNextBoss(boss);
     }
@@ -380,12 +489,29 @@ function applyOneEntry(quick: EntryAnalysis, batchId: string, get: any, set: any
       }
     }
     const finalGold = s.profile.gold + goldGain;
+    const reward: RewardLedgerEntry = {
+      at: Date.now(),
+      xpDelta: finalXp - s.profile.xp,
+      goldDelta: finalGold - s.profile.gold,
+      bossDamage,
+      bossDefeated: bossDefeatedNow,
+      bossDefeatedAt,
+      trophyExpiresAt: trophy?.expiresAt,
+      loot: lastLoot?.item || null,
+      inventoryDelta: {
+        focus: inventory.focus - s.inventory.focus,
+        crit: inventory.crit - s.inventory.crit,
+        freeze: inventory.freeze - s.inventory.freeze,
+      },
+      freezeUsedDays: [],
+    };
     const prevBadgeIds = new Set(BADGES.filter(b => b.earned(badgeCtxFor(s))).map(b => b.id));
     return rederive(
       {
         ...s, entries,
         profile: { ...s.profile, xp: finalXp, gold: finalGold, bossesDefeated, hourlyStreak, hourlyBest, lastHourlyTick },
         combo, comboBest, comboExpiresAt, buffs, boss, trophy, inventory, lastLoot,
+        rewardLedger: { ...s.rewardLedger, [entry.id]: reward },
       },
       { delta: entry.xpDelta, sentiment: entry.sentiment, combo },
       prevBadgeIds,
@@ -434,12 +560,19 @@ function rederive(s: State, change?: { delta: number; sentiment: Entry['sentimen
     else if (e.sentiment === 'negative') d.n++;
   }
   const perfectDays = Object.values(dayMap).filter(d => d.p >= 3 && d.n === 0).length;
-  const longestStreak = Math.max(s.profile.longestStreak, computeStreak(s.entries));
+  const freezeSync = rebuildFreezeLedger(s.entries, s.streakFreezeDays, s.inventory.freeze);
+  const longestStreak = Math.max(s.profile.longestStreak, computeStreak(s.entries, freezeSync.days));
   const next: State = {
     ...s,
     profile: { ...s.profile, perfectDays, longestStreak },
     quests: s.quests.length ? s.quests.map(q => recomputeQuestProgress(q, s.entries, today, s.comboBest)) : s.quests,
     lastChange: change ? { delta: change.delta, sentiment: change.sentiment, combo: change.combo, at: Date.now() } : s.lastChange,
+    rewardLedger: s.rewardLedger,
+    streakFreezeDays: freezeSync.days,
+    inventory: { ...s.inventory, freeze: freezeSync.remaining },
+    boss: rebuildBossFromLedger(s.entries, s.rewardLedger) ?? (s.entries.length > 0 ? s.boss : null),
+    lastLoot: rebuildLoot(s.entries, s.rewardLedger),
+    trophy: rebuildTrophy(s.entries, s.rewardLedger),
   };
   // Detect newly unlocked badges
   if (prevBadgeIds) {
@@ -465,11 +598,13 @@ export const useHabitStore = create<State>()(
       questsCompletedTotal: 0,
       lastChange: null,
       lastLoot: null,
+      rewardLedger: {},
       apiKey: '',
       combo: 0,
       comboBest: 0,
       comboExpiresAt: 0,
       inventory: { focus: 0, crit: 0, freeze: 0 },
+      streakFreezeDays: [],
       passes: {},
       buffs: { focus: false, crit: false },
       boss: null,
@@ -511,155 +646,36 @@ export const useHabitStore = create<State>()(
       },
 
       async addEntry(text) {
-        const trimmed = text.trim();
-        if (!trimmed) throw new Error('empty');
-        const id = crypto.randomUUID();
-        const now = new Date();
-
-        const quick = heuristicAnalyze(trimmed);
-        const sNow = get();
-        const liveCombo = Date.now() < sNow.comboExpiresAt ? sNow.combo : 0;
-
-        const baseDelta = quick.xpDelta;
-        let mult = quick.sentiment === 'positive' ? multiplierFor(liveCombo) : 1;
-        // apply active buffs to positives
-        const useFocus = sNow.buffs.focus && quick.sentiment === 'positive';
-        const useCrit  = sNow.buffs.crit  && quick.sentiment === 'positive';
-        if (useFocus) mult *= 2;
-        if (useCrit) mult *= 3;
-        // Trophy buff: +10% positive XP for 24h after defeating a boss.
-        if (quick.sentiment === 'positive' && sNow.trophy && Date.now() < sNow.trophy.expiresAt) mult *= 1.1;
-        const xpDelta = Math.round(baseDelta * mult);
-
-        const entry: Entry = {
-          id, text: trimmed, title: quick.title,
-          createdAt: now.toISOString(), dayKey: dayKey(now),
-          parentId: quick.parentId, subId: quick.subId,
-          sentiment: quick.sentiment, intensity: quick.intensity,
-          baseDelta, xpDelta,
-          comboAtTime: liveCombo, multiplierAtTime: mult,
-          reasoning: quick.reasoning, quip: quick.quip, tone: quick.tone,
-          source: quick.source, analyzing: true,
-        };
-
-        let droppedLoot: LootItem | null = null;
-
-        set(s => {
-          const entries = [entry, ...s.entries];
-          const xp = Math.max(0, s.profile.xp + entry.xpDelta);
-          let combo = s.combo, comboBest = s.comboBest, comboExpiresAt = s.comboExpiresAt;
-          if (Date.now() >= comboExpiresAt) combo = 0;
-          if (entry.sentiment === 'positive') {
-            combo += 1;
-            comboExpiresAt = Date.now() + COMBO_WINDOW_MS;
-            comboBest = Math.max(comboBest, combo);
-          } else if (entry.sentiment === 'negative') {
-            combo = 0; comboExpiresAt = 0;
-          }
-          // consume buffs
-          const buffs: ActiveBuffs = {
-            focus: s.buffs.focus && !useFocus,
-            crit:  s.buffs.crit  && !useCrit,
-          };
-          // deal boss damage on positives
-          let boss = ensureBoss(s.boss);
-          if (entry.sentiment === 'positive') {
-            const dmg = damageFor(entry.intensity, mult);
-            boss = { ...boss, hpLeft: Math.max(0, boss.hpLeft - dmg) };
-            if (boss.hpLeft <= 0 && !boss.defeated) {
-              boss = { ...boss, defeated: true, defeatedAt: Date.now() };
-            }
-          }
-          // roll loot on positives
-          if (entry.sentiment === 'positive') {
-            droppedLoot = rollLoot(entry.intensity, combo);
-          }
-          // apply boss defeat reward + loot to xp / inventory
-          let finalXp = xp;
-          let inventory = s.inventory;
-          let lastLoot = s.lastLoot;
-          let bossesDefeated = s.profile.bossesDefeated;
-          let trophy = s.trophy;
-          if (boss.defeated && (!s.boss || !s.boss.defeated)) {
-            finalXp += boss.xpReward;
-            bossesDefeated += 1;
-            // Grant a 24h Boss Trophy buff (+10% positive XP)
-            trophy = { expiresAt: Date.now() + 24 * 60 * 60 * 1000 };
-          }
-          if (droppedLoot) {
-            lastLoot = { item: droppedLoot, at: Date.now() };
-            switch (droppedLoot.kind) {
-              case 'xp_boost_small': finalXp += 10; break;
-              case 'xp_boost_big':   finalXp += 25; break;
-              case 'focus_token':    inventory = { ...inventory, focus: inventory.focus + 1 }; break;
-              case 'crit_strike':    inventory = { ...inventory, crit: inventory.crit + 1 }; break;
-              case 'streak_freeze':  inventory = { ...inventory, freeze: inventory.freeze + 1 }; break;
-            }
-          }
-          const prevBadgeIds = new Set(BADGES.filter(b => b.earned(badgeCtxFor(s))).map(b => b.id));
-          return rederive(
-            {
-              ...s,
-              entries,
-              profile: { ...s.profile, xp: finalXp, bossesDefeated },
-              combo, comboBest, comboExpiresAt,
-              buffs, boss, inventory, lastLoot, trophy,
-            },
-            { delta: entry.xpDelta, sentiment: entry.sentiment, combo },
-            prevBadgeIds,
-          );
-        });
-
-        // Always try to upgrade via best-available AI, with memory-derived context.
-        {
-          const memoryContext = memoryAsPrompt(deriveMemory(get().entries));
-          analyzeEntry(trimmed, { apiKey: get().apiKey, memoryContext }).then((ai: EntryAnalysis) => {
-            if (ai.source === 'rules') return; // no upgrade available
-            set(s => {
-              const old = s.entries.find(e => e.id === id);
-              if (!old) return s;
-              const mult2 = ai.sentiment === 'positive' ? old.multiplierAtTime : 1;
-              const newApplied = Math.round(ai.xpDelta * mult2);
-              const xpAdjustment = newApplied - old.xpDelta;
-              // sentiment flipped? adjust combo too
-              let combo = s.combo, comboBest = s.comboBest, comboExpiresAt = s.comboExpiresAt;
-              if (old.sentiment !== ai.sentiment) {
-                if (ai.sentiment === 'negative') { combo = 0; comboExpiresAt = 0; }
-                else if (ai.sentiment === 'positive' && old.sentiment !== 'positive') {
-                  combo += 1;
-                  comboExpiresAt = Date.now() + COMBO_WINDOW_MS;
-                  comboBest = Math.max(comboBest, combo);
-                }
-              }
-              const updated: Entry = {
-                ...old,
-                parentId: ai.parentId, subId: ai.subId,
-                sentiment: ai.sentiment, intensity: ai.intensity,
-                baseDelta: ai.xpDelta, xpDelta: newApplied,
-                reasoning: ai.reasoning, quip: ai.quip || old.quip, tone: ai.tone,
-                title: ai.title || old.title, source: ai.source, analyzing: false,
-              };
-              const entries = s.entries.map(e => e.id === id ? updated : e);
-              const xp = Math.max(0, s.profile.xp + xpAdjustment);
-              return rederive({ ...s, entries, profile: { ...s.profile, xp }, combo, comboBest, comboExpiresAt });
-            });
-          }).catch(() => {
-            set(s => ({ entries: s.entries.map(e => e.id === id ? { ...e, analyzing: false } : e) }));
-          });
-        }
-
-        return entry;
+        return get().addEntries(text).then(xs => xs[0]);
       },
 
       deleteEntry(id) {
         set(s => {
           const e = s.entries.find(x => x.id === id);
           if (!e) return s;
-          const xp = Math.max(0, s.profile.xp - e.xpDelta);
+          const reward = s.rewardLedger[id];
+          const reversed = reverseRewardDelta(
+            {
+              xp: s.profile.xp,
+              gold: s.profile.gold,
+              bossesDefeated: s.profile.bossesDefeated,
+              inventory: s.inventory,
+            },
+            {
+              xpDelta: reward?.xpDelta ?? e.xpDelta,
+              goldDelta: reward?.goldDelta ?? 0,
+              bossesDefeatedDelta: reward?.bossDefeated ? 1 : 0,
+              inventoryDelta: reward?.inventoryDelta,
+            },
+          );
+          const rewardLedger = { ...s.rewardLedger };
+          delete rewardLedger[id];
           return rederive({
             ...s,
             entries: s.entries.filter(x => x.id !== id),
-            profile: { ...s.profile, xp },
+            profile: { ...s.profile, xp: reversed.xp, gold: reversed.gold, bossesDefeated: reversed.bossesDefeated },
+            inventory: reversed.inventory,
+            rewardLedger,
           });
         });
       },
@@ -704,6 +720,12 @@ export const useHabitStore = create<State>()(
           set({ inventory: { ...s.inventory, focus: s.inventory.focus - 1 }, buffs: { ...s.buffs, focus: true } });
         } else if (kind === 'crit' && s.inventory.crit > 0) {
           set({ inventory: { ...s.inventory, crit: s.inventory.crit - 1 }, buffs: { ...s.buffs, crit: true } });
+        } else if (kind === 'freeze' && s.inventory.freeze > 0) {
+          const day = dayKey();
+          set({
+            inventory: { ...s.inventory, freeze: s.inventory.freeze - 1 },
+            streakFreezeDays: s.streakFreezeDays.includes(day) ? s.streakFreezeDays : [...s.streakFreezeDays, day],
+          });
         }
       },
 
@@ -1047,7 +1069,7 @@ export const useHabitStore = create<State>()(
       todayNetXp() {
         return get().todayEntries().reduce((a, e) => a + e.xpDelta, 0);
       },
-      currentStreak() { return computeStreak(get().entries); },
+      currentStreak() { return computeStreak(get().entries, get().streakFreezeDays); },
       unlockedBadges() {
         return BADGES.filter(b => b.earned(badgeCtxFor(get()))).map(b => b.id);
       },
@@ -1061,6 +1083,8 @@ export const useHabitStore = create<State>()(
           if (typeof s.profile.hourlyBest   !== 'number') s.profile.hourlyBest = 0;
           if (typeof s.profile.lastHourlyTick !== 'number') s.profile.lastHourlyTick = 0;
         }
+        if (s && !s.rewardLedger) s.rewardLedger = {};
+        if (s && !Array.isArray(s.streakFreezeDays)) s.streakFreezeDays = [];
         if (s && s.profile && typeof s.profile.gold !== 'number') {
           // v11 -> v12 migration: seed gold from positive XP earned so users don't start broke.
           const positiveXp = s.entries

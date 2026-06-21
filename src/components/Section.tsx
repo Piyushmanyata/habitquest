@@ -8,12 +8,12 @@ import { ChevronDown } from 'lucide-react';
 export type SectionTheme = 'hero' | 'journal' | 'battle' | 'insight' | 'armory' | 'chat';
 
 const EYEBROW_COLOR: Record<SectionTheme, string> = {
-  hero:    'text-purple-300',
+  hero:    'text-purple-200',
   journal: 'text-[var(--accent)]',
-  battle:  'text-amber-300',
-  insight: 'text-sky-300',
-  armory:  'text-purple-300',
-  chat:    'text-sky-300',
+  battle:  'text-amber-200',
+  insight: 'text-sky-200',
+  armory:  'text-purple-200',
+  chat:    'text-sky-200',
 };
 
 const EYEBROW_DOT: Record<SectionTheme, string> = {
@@ -69,6 +69,7 @@ export default function Section({
             <div>
               <div className={`section-eyebrow ${EYEBROW_COLOR[theme]}`}>{eyebrow}</div>
               <h2 className="section-title mt-1">{title}</h2>
+              {subtitle && <div className="mt-2 text-[12px] text-[var(--muted)] max-w-2xl sm:hidden">{subtitle}</div>}
             </div>
           </div>
           <div className="flex items-center gap-3 ml-auto">

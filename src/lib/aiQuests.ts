@@ -1,48 +1,13 @@
 // AI-generated quest suggestions based on recent journal entries.
 // Designed to give the user fresh, contextual goals as they log.
 
-import { FREE_MODELS } from './ai';
 import type { Quest } from './gamification';
-
-const DEEPSEEK_URL   = 'https://api.deepseek.com/chat/completions';
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-
-function getKey() {
-  if (typeof localStorage === 'undefined') return '';
-  return (
-    localStorage.getItem('hq-openrouter-key') ||
-    localStorage.getItem('hq-deepseek-key') ||
-    (import.meta as any).env?.VITE_OPENROUTER_KEY ||
-    (import.meta as any).env?.VITE_DEEPSEEK_KEY ||
-    ''
-  );
-}
-function getSelectedModel() {
-  if (typeof localStorage === 'undefined') return FREE_MODELS[0].id;
-  return localStorage.getItem('hq-model') || FREE_MODELS[0].id;
-}
-function pickProvider(key: string) {
-  if (key.startsWith('sk-or-')) {
-    return {
-      url: OPENROUTER_URL, model: getSelectedModel(),
-      extraHeaders: { 'HTTP-Referer': location.origin, 'X-Title': 'HabitQuest' } as Record<string,string>,
-      providerName: 'openrouter' as const,
-    };
-  }
-  return { url: DEEPSEEK_URL, model: 'deepseek-chat', extraHeaders: {} as Record<string,string>, providerName: 'deepseek' as const };
-}
-function extractJson(text: string): any | null {
-  try { return JSON.parse(text); } catch {}
-  const f = text.match(/```(?:json)?\s*([\s\S]+?)```/i); if (f) { try { return JSON.parse(f[1]); } catch {} }
-  const a = text.indexOf('{'), b = text.lastIndexOf('}');
-  if (a >= 0 && b > a) { try { return JSON.parse(text.slice(a, b + 1)); } catch {} }
-  return null;
-}
+import { callJsonCompletion, getStoredApiKey } from './aiClient';
 
 export type RecentEntry = { title: string; sentiment: string; parentId: string };
 
 export async function suggestQuestFromRecent(recent: RecentEntry[], dayKey: string): Promise<Quest | null> {
-  const apiKey = getKey();
+  const apiKey = getStoredApiKey();
   if (!apiKey || recent.length === 0) return null;
 
   const list = recent.slice(0, 8).map(e =>
@@ -124,50 +89,29 @@ Recent:
 - "Hit snooze 4 times" [negative, health]
 Output: {"title":"Tonight's Anchor","description":"Set phone to charge outside the bedroom by 10:30 pm.","emoji":"🌙","xpReward":50}`;
 
-  const prov = pickProvider(apiKey);
-  const tryOrder = prov.providerName === 'openrouter'
-    ? [prov.model, ...FREE_MODELS.map(m => m.id).filter(id => id !== prov.model)]
-    : [prov.model];
-
-  for (const model of tryOrder) {
-    try {
-      const res = await fetch(prov.url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}`, ...prov.extraHeaders },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: list },
-          ],
-          // Mid temperature — variety on archetype + emoji, locked on JSON shape.
-          temperature: 0.7,
-          max_tokens: 240,
-          response_format: { type: 'json_object' },
-        }),
-      });
-      if (!res.ok) { if (res.status === 429 || res.status === 404) continue; throw new Error('AI ' + res.status); }
-      const data = await res.json();
-      const parsed = extractJson(data?.choices?.[0]?.message?.content || '');
-      if (!parsed?.title) continue;
-      const quest: Quest = {
-        id: `${dayKey}-ai-${Date.now()}`,
-        kind: 'complete_n_habits', // we evaluate it manually via "Did it" button (no auto-progress)
-        title: String(parsed.title).slice(0, 40),
-        description: String(parsed.description || '').slice(0, 160),
-        emoji: String(parsed.emoji || '✨').slice(0, 4),
-        target: 1,
-        progress: 0,
-        xpReward: Math.max(15, Math.min(120, Math.round(Number(parsed.xpReward) || 35))),
-        completed: false,
-        claimed: false,
-        dayKey,
-      };
-      return quest;
-    } catch (err) {
-      console.warn('[aiQuests] try failed:', model, err);
-      continue;
-    }
-  }
-  return null;
+  const parsed = await callJsonCompletion({
+    apiKey,
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: list },
+    ],
+    temperature: 0.7,
+    maxTokens: 240,
+    responseFormat: true,
+  });
+  if (!parsed?.title) return null;
+  const quest: Quest = {
+    id: `${dayKey}-ai-${Date.now()}`,
+    kind: 'complete_n_habits', // we evaluate it manually via "Did it" button (no auto-progress)
+    title: String(parsed.title).slice(0, 40),
+    description: String(parsed.description || '').slice(0, 160),
+    emoji: String(parsed.emoji || '✨').slice(0, 4),
+    target: 1,
+    progress: 0,
+    xpReward: Math.max(15, Math.min(120, Math.round(Number(parsed.xpReward) || 35))),
+    completed: false,
+    claimed: false,
+    dayKey,
+  };
+  return quest;
 }

@@ -1,18 +1,14 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import TopBar from './components/TopBar';
 import JournalInput from './components/JournalInput';
 import Quests from './components/Quests';
 import Stats from './components/Stats';
-import Settings from './components/Settings';
 import XpToast from './components/XpToast';
 import ScreenFx from './components/ScreenFx';
-import DailyRecap from './components/DailyRecap';
 import Boss from './components/Boss';
 import LootToast from './components/LootToast';
-import Analytics from './components/Analytics';
 import AiStatus from './components/AiStatus';
 import LevelUpBanner from './components/LevelUpBanner';
-import Shop from './components/Shop';
 import PassBar from './components/PassBar';
 import MemoryCard from './components/MemoryCard';
 import CheckinBanner from './components/CheckinBanner';
@@ -21,10 +17,8 @@ import WisdomPanel from './components/WisdomPanel';
 import AchievementReveal from './components/AchievementReveal';
 import TrophyChip from './components/TrophyChip';
 import ComboCallout from './components/ComboCallout';
-import Logs from './components/Logs';
 import StreakCalendar from './components/StreakCalendar';
 import CoachChat from './components/CoachChat';
-import MoodPanel from './components/MoodPanel';
 import BadgesPanel from './components/BadgesPanel';
 import AmbientParticles from './components/AmbientParticles';
 import FloatingNumbers from './components/FloatingNumbers';
@@ -33,6 +27,13 @@ import Armory from './components/Armory';
 import Section from './components/Section';
 import StreakSliders from './components/StreakSliders';
 import { useHabitStore } from './store/useHabitStore';
+
+const Settings = lazy(() => import('./components/Settings'));
+const DailyRecap = lazy(() => import('./components/DailyRecap'));
+const Analytics = lazy(() => import('./components/Analytics'));
+const Shop = lazy(() => import('./components/Shop'));
+const Logs = lazy(() => import('./components/Logs'));
+const MoodPanelLazy = lazy(() => import('./components/MoodPanel'));
 
 type Tab = 'home' | 'logs' | 'analytics' | 'mood' | 'shop';
 
@@ -82,10 +83,10 @@ export default function App() {
     <div className="min-h-screen px-5 md:px-6 py-5 md:py-7 max-w-7xl mx-auto">
       <TopBar onOpenSettings={() => setSettingsOpen(true)} onOpenRecap={() => setRecapOpen(true)} />
 
-      <div className="flex items-center gap-1 mb-5 flex-wrap">
+      <div className="flex items-center gap-1 mb-5 flex-wrap overflow-x-auto pb-1">
         <TabBtn name="home"      active={tab === 'home'}      onClick={() => setTab('home')}      kbd="1" />
         <TabBtn name="logs"      active={tab === 'logs'}      onClick={() => setTab('logs')}      kbd="2" />
-        <TabBtn name="analytics" active={tab === 'analytics'} onClick={() => setTab('analytics')} kbd="3" />
+        <TabBtn name="codex"     active={tab === 'analytics'} onClick={() => setTab('analytics')} kbd="3" />
         <TabBtn name="mood"      active={tab === 'mood'}      onClick={() => setTab('mood')}      kbd="4" />
         <TabBtn name="shop"      active={tab === 'shop'}      onClick={() => setTab('shop')}      kbd="5" />
         <TrophyChip />
@@ -98,19 +99,19 @@ export default function App() {
         <div className="space-y-6">
           {/* Quick-jump nav inside home page */}
           <div className="flex flex-wrap gap-1.5 text-[11px] mono uppercase tracking-wider">
-            <JumpChip onClick={() => scrollToAnchor('hero')}    label="hero"    accent="purple" />
-            <JumpChip onClick={() => scrollToAnchor('journal')} label="journal" accent="lime" />
-            <JumpChip onClick={() => scrollToAnchor('battle')}  label="battle"  accent="warm" />
-            <JumpChip onClick={() => scrollToAnchor('insight')} label="insight" accent="info" />
-            <JumpChip onClick={() => scrollToAnchor('armory')}  label="armory"  accent="purple" />
-            <JumpChip onClick={() => scrollToAnchor('chat')}    label="sage"    accent="info" />
+            <JumpChip onClick={() => scrollToAnchor('hero')}    label="hero forge"    accent="purple" />
+            <JumpChip onClick={() => scrollToAnchor('journal')} label="journal"        accent="lime" />
+            <JumpChip onClick={() => scrollToAnchor('battle')}  label="boss encounter" accent="warm" />
+            <JumpChip onClick={() => scrollToAnchor('insight')} label="codex"          accent="info" />
+            <JumpChip onClick={() => scrollToAnchor('armory')}  label="armory"         accent="purple" />
+            <JumpChip onClick={() => scrollToAnchor('chat')}    label="campfire"       accent="info" />
           </div>
 
           {/* ═══ HERO ═══ */}
           <Section
             id="hero" theme="hero"
-            eyebrow="01 · your hero" title="Character & Streaks"
-            subtitle="Equip gear, watch every time-window streak, and aim at today's boss."
+            eyebrow="realm i · hero forge" title="Hero Forge"
+            subtitle="Equip gear, watch every streak band, and pressure today's boss."
           >
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <Character />
@@ -125,8 +126,8 @@ export default function App() {
           {/* ═══ JOURNAL — collapsible ═══ */}
           <Section
             id="journal" theme="journal"
-            eyebrow="02 · log the day" title="Journal"
-            subtitle="Write what you did. Past entries live in the Logs tab — by category or by date."
+            eyebrow="realm ii · journal command" title="Journal"
+            subtitle="Write what you did. Past entries live in the Logs tab by category or date."
             collapsible defaultOpen
           >
             <div className="space-y-4">
@@ -139,7 +140,7 @@ export default function App() {
           {/* ═══ BATTLE ═══ */}
           <Section
             id="battle" theme="battle"
-            eyebrow="03 · today's fight" title="Challenge & Quests"
+            eyebrow="realm iii · encounter board" title="Quest Board"
             subtitle="Daily challenge from Sage and rolling quests that refresh as you claim them."
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -151,7 +152,7 @@ export default function App() {
           {/* ═══ INSIGHT ═══ */}
           <Section
             id="insight" theme="insight"
-            eyebrow="04 · what sage sees" title="Memory, Wisdom & Badges"
+            eyebrow="realm iv · codex" title="Codex"
             subtitle="The patterns Sage has learned about you and every badge you've banked."
           >
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -167,7 +168,7 @@ export default function App() {
           {/* ═══ ARMORY ═══ */}
           <Section
             id="armory" theme="armory"
-            eyebrow="05 · gear up" title="The Armory"
+            eyebrow="realm v · armory" title="The Armory"
             subtitle="Trade XP for permanent gear. Bonuses stack and apply to every positive entry."
           >
             <Armory />
@@ -176,7 +177,7 @@ export default function App() {
           {/* ═══ CHAT WITH SAGE — full width, prominent ═══ */}
           <Section
             id="chat" theme="chat"
-            eyebrow="06 · talk to sage" title="Coach Conversation"
+            eyebrow="campfire · sage" title="Campfire"
             subtitle="Ask anything. Sage remembers your patterns and replies in your chosen tone."
           >
             <CoachChat />
@@ -184,13 +185,15 @@ export default function App() {
         </div>
       )}
 
-      {tab === 'logs'      && <Logs />}
-      {tab === 'analytics' && <Analytics />}
-      {tab === 'mood'      && <MoodPanel />}
-      {tab === 'shop'      && <Shop />}
+      <Suspense fallback={<LazyPanel label="Loading panel…" />}>
+        {tab === 'logs'      && <Logs />}
+        {tab === 'analytics' && <Analytics />}
+        {tab === 'mood'      && <MoodPanelLazy />}
+        {tab === 'shop'      && <Shop />}
 
-      <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-      <DailyRecap open={recapOpen} onClose={() => setRecapOpen(false)} />
+        <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+        <DailyRecap open={recapOpen} onClose={() => setRecapOpen(false)} />
+      </Suspense>
       <AmbientParticles />
       <ScreenFx />
       <XpToast />
@@ -208,7 +211,7 @@ function TabBtn({ name, active, onClick, kbd }: { name: string; active: boolean;
     <button
       onClick={onClick}
       title={kbd ? `Press ${kbd}` : undefined}
-      className={`px-3 py-1.5 rounded-md text-[12px] font-medium uppercase tracking-wider transition flex items-center gap-1.5
+      className={`px-3 py-1.5 rounded-md text-[12px] font-medium uppercase tracking-wider transition flex items-center gap-1.5 whitespace-nowrap flex-shrink-0
         ${active ? 'bg-[var(--accent)] text-[#0a0a0b]' : 'text-[var(--muted)] hover:text-[var(--fg)] hover:bg-white/5'}`}
     >
       {name}
@@ -245,9 +248,17 @@ function JumpChip({ label, accent, onClick }: { label: string; accent: 'lime' | 
   return (
     <button
       onClick={onClick}
-      className={`px-2.5 py-1 rounded-full border bg-transparent hover:bg-white/[0.03] transition ${cls}`}
+      className={`px-2.5 py-1 rounded-full border bg-transparent hover:bg-white/[0.03] transition whitespace-nowrap ${cls}`}
     >
       ↓ {label}
     </button>
+  );
+}
+
+function LazyPanel({ label }: { label: string }) {
+  return (
+    <div className="surface p-4 text-sm text-[var(--muted)] mono uppercase tracking-wider">
+      {label}
+    </div>
   );
 }

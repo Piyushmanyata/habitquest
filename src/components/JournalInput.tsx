@@ -34,7 +34,7 @@ export default function JournalInput() {
         <Sparkles className="w-3.5 h-3.5 text-[var(--accent)]" />
         <span>What did you just do? Tell Sage what happened, how you felt, what you thought.</span>
         <span className="ml-auto mono text-[10px] text-[var(--muted-2)]">
-          {apiKey ? 'sage · cloud' : 'heuristic'}
+          {apiKey ? 'sage · cloud' : 'rules fallback'}
         </span>
       </div>
       <textarea

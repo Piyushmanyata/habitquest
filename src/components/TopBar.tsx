@@ -9,14 +9,15 @@ import AnimatedNumber from './AnimatedNumber';
 export default function TopBar({ onOpenSettings, onOpenRecap }: { onOpenSettings: () => void; onOpenRecap: () => void }) {
   const xp = useHabitStore(s => s.profile.xp);
   const gold = useHabitStore(s => s.profile.gold);
+  const freeze = useHabitStore(s => s.inventory.freeze);
   const hourly = useHabitStore(s => s.profile.hourlyStreak);
   const streak = useHabitStore(s => s.currentStreak());
   const todayNet = useHabitStore(s => s.todayNetXp());
   const lvl = levelFromXp(xp);
 
   return (
-    <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
-      <div className="flex items-center gap-3">
+    <div className="flex flex-col gap-3 mb-6 md:flex-row md:items-center md:justify-between">
+      <div className="flex items-center gap-3 min-w-0">
         <div className="w-7 h-7 rounded-md bg-[var(--accent)] grid place-items-center">
           <span className="text-[#0a0a0b] font-bold text-sm">●</span>
         </div>
@@ -25,7 +26,7 @@ export default function TopBar({ onOpenSettings, onOpenRecap }: { onOpenSettings
         <ComboMeter />
       </div>
 
-      <div className="flex items-center gap-5">
+      <div className="flex items-center gap-4 flex-wrap md:justify-end">
         <Stat label="streak" value={`${streak}d`} />
         <Stat label="hourly" value={`${hourly}h`} accent={hourly >= 3 ? 'pos' : undefined} />
         <Stat label="level" value={<AnimatedNumber value={lvl.level} />} />
@@ -34,12 +35,13 @@ export default function TopBar({ onOpenSettings, onOpenRecap }: { onOpenSettings
           <span className="mono text-sm font-medium text-amber-300"><AnimatedNumber value={gold} /></span>
           <span className="text-[10px] uppercase tracking-wider text-[var(--muted-2)]">gold</span>
         </div>
+        <Stat label="freeze" value={`${freeze}`} accent={freeze > 0 ? 'pos' : undefined} />
         <Stat
           label="today XP"
           value={<AnimatedNumber value={todayNet} sign />}
           accent={todayNet > 0 ? 'pos' : todayNet < 0 ? 'neg' : undefined}
         />
-        <div className="hidden md:flex items-center gap-2 min-w-[140px]">
+        <div className="hidden lg:flex items-center gap-2 min-w-[140px]">
           <span className="mono text-[10px] text-[var(--muted-2)]">L{lvl.level}</span>
           <div className="flex-1 h-1 bg-[var(--line)] rounded-full overflow-hidden">
             <motion.div

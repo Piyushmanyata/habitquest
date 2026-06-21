@@ -1,45 +1,10 @@
 // Multi-entry analyzer: takes free-form journal text that may contain multiple
 // actions and returns an array of independently-scored analyses, in order.
 
-import { FREE_MODELS } from './ai';
 import type { EntryAnalysis, ReactionTone } from './ai';
 import { CATEGORIES, CAT_BY_ID } from './categories';
+import { callJsonCompletion, getStoredApiKey } from './aiClient';
 import { heuristicAnalyze } from './heuristic';
-
-const DEEPSEEK_URL   = 'https://api.deepseek.com/chat/completions';
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-
-function getKey() {
-  if (typeof localStorage === 'undefined') return '';
-  return (
-    localStorage.getItem('hq-openrouter-key') ||
-    localStorage.getItem('hq-deepseek-key') ||
-    (import.meta as any).env?.VITE_OPENROUTER_KEY ||
-    (import.meta as any).env?.VITE_DEEPSEEK_KEY ||
-    ''
-  );
-}
-function getSelectedModel() {
-  if (typeof localStorage === 'undefined') return FREE_MODELS[0].id;
-  return localStorage.getItem('hq-model') || FREE_MODELS[0].id;
-}
-function pickProvider(key: string) {
-  if (key.startsWith('sk-or-')) {
-    return {
-      url: OPENROUTER_URL, model: getSelectedModel(),
-      extraHeaders: { 'HTTP-Referer': location.origin, 'X-Title': 'HabitQuest' } as Record<string,string>,
-      providerName: 'openrouter' as const,
-    };
-  }
-  return { url: DEEPSEEK_URL, model: 'deepseek-chat', extraHeaders: {} as Record<string,string>, providerName: 'deepseek' as const };
-}
-function extractJson(text: string): any | null {
-  try { return JSON.parse(text); } catch {}
-  const f = text.match(/```(?:json)?\s*([\s\S]+?)```/i); if (f) { try { return JSON.parse(f[1]); } catch {} }
-  const a = text.indexOf('{'), b = text.lastIndexOf('}');
-  if (a >= 0 && b > a) { try { return JSON.parse(text.slice(a, b + 1)); } catch {} }
-  return null;
-}
 
 const ALLOWED_TONES: ReactionTone[] = ['cheer','hype','roast','wry','gentle','sass'];
 function clamp(n: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, n)); }
@@ -357,39 +322,19 @@ Output: {"entries":[
 }
 
 async function callWithFallback(system: string, user: string): Promise<any | null> {
-  const apiKey = getKey();
+  const apiKey = getStoredApiKey();
   if (!apiKey) return null;
-  const prov = pickProvider(apiKey);
-  const tryOrder = prov.providerName === 'openrouter'
-    ? [prov.model, ...FREE_MODELS.map(m => m.id).filter(id => id !== prov.model)]
-    : [prov.model];
-  for (const model of tryOrder) {
-    try {
-      const res = await fetch(prov.url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}`, ...prov.extraHeaders },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user },
-          ],
-          // Lower temperature → more consistent categories + XP math.
-          // Higher max_tokens → room for 6-entry batches with full quips.
-          temperature: 0.55, max_tokens: 900,
-          response_format: { type: 'json_object' },
-        }),
-      });
-      if (!res.ok) { if (res.status === 429 || res.status === 404) continue; throw new Error('AI ' + res.status); }
-      const data = await res.json();
-      const content = data?.choices?.[0]?.message?.content ?? '';
-      const parsed = extractJson(content);
-      if (parsed) return parsed;
-    } catch (err) {
-      console.warn('[aiMulti] try failed:', model, err);
-      continue;
-    }
-  }
+  const parsed = await callJsonCompletion({
+    apiKey,
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+    temperature: 0.55,
+    maxTokens: 900,
+    responseFormat: true,
+  });
+  if (parsed) return parsed;
   return null;
 }
 

@@ -10,7 +10,7 @@ export default function AiStatus() {
     return (
       <div className="flex items-center gap-1.5 text-[11px]">
         <Brain className="w-3.5 h-3.5 text-[var(--muted-2)]" />
-        <span className="mono text-[var(--muted)]">heuristic — add key in settings</span>
+        <span className="mono text-[var(--muted)]">rules fallback — add key in settings</span>
       </div>
     );
   }

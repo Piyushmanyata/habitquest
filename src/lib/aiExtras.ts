@@ -2,83 +2,21 @@
 // Mirrors the dual-provider routing of ai.ts but lives separately to keep that file focused.
 
 import { CATEGORIES, CAT_BY_ID } from './categories';
-import { FREE_MODELS } from './ai';
-
-const DEEPSEEK_URL  = 'https://api.deepseek.com/chat/completions';
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-
-function getKey() {
-  if (typeof localStorage === 'undefined') return '';
-  return (
-    localStorage.getItem('hq-openrouter-key') ||
-    localStorage.getItem('hq-deepseek-key') ||
-    (import.meta as any).env?.VITE_OPENROUTER_KEY ||
-    (import.meta as any).env?.VITE_DEEPSEEK_KEY ||
-    ''
-  );
-}
-
-function getSelectedModel() {
-  if (typeof localStorage === 'undefined') return FREE_MODELS[0].id;
-  return localStorage.getItem('hq-model') || FREE_MODELS[0].id;
-}
-
-function pickProvider(key: string) {
-  if (key.startsWith('sk-or-')) {
-    return {
-      url: OPENROUTER_URL,
-      model: getSelectedModel(),
-      extraHeaders: { 'HTTP-Referer': location.origin, 'X-Title': 'HabitQuest' } as Record<string, string>,
-      providerName: 'openrouter' as const,
-    };
-  }
-  return { url: DEEPSEEK_URL, model: 'deepseek-chat', extraHeaders: {} as Record<string, string>, providerName: 'deepseek' as const };
-}
-
-function extractJson(text: string): any | null {
-  try { return JSON.parse(text); } catch {}
-  const fence = text.match(/```(?:json)?\s*([\s\S]+?)```/i);
-  if (fence) { try { return JSON.parse(fence[1]); } catch {} }
-  const first = text.indexOf('{');
-  const last = text.lastIndexOf('}');
-  if (first >= 0 && last > first) { try { return JSON.parse(text.slice(first, last + 1)); } catch {} }
-  return null;
-}
+import { callJsonCompletion, getStoredApiKey } from './aiClient';
 
 async function chat(system: string, user: string, opts: { temperature?: number; max_tokens?: number } = {}): Promise<any | null> {
-  const apiKey = getKey();
+  const apiKey = getStoredApiKey();
   if (!apiKey) return null;
-  const prov = pickProvider(apiKey);
-  const tryOrder = prov.providerName === 'openrouter'
-    ? [prov.model, ...FREE_MODELS.map(m => m.id).filter(id => id !== prov.model)]
-    : [prov.model];
-  for (const model of tryOrder) {
-    try {
-      const res = await fetch(prov.url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}`, ...prov.extraHeaders },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user },
-          ],
-          temperature: opts.temperature ?? 0.6,
-          max_tokens: opts.max_tokens ?? 220,
-          response_format: { type: 'json_object' },
-        }),
-      });
-      if (!res.ok) { if (res.status === 429 || res.status === 404) continue; throw new Error('AI ' + res.status); }
-      const data = await res.json();
-      const content = data?.choices?.[0]?.message?.content ?? '';
-      const parsed = extractJson(content);
-      if (parsed) return parsed;
-    } catch (err) {
-      console.warn('[aiExtras] try failed:', model, err);
-      continue;
-    }
-  }
-  return null;
+  return callJsonCompletion({
+    apiKey,
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+    temperature: opts.temperature ?? 0.6,
+    maxTokens: opts.max_tokens ?? 220,
+    responseFormat: true,
+  });
 }
 
 // ─── Custom item pricing ───────────────────────────────────────────────

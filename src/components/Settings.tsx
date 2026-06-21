@@ -68,7 +68,7 @@ export default function Settings({ open, onClose }: { open: boolean; onClose: ()
                 type="password"
               />
               <p className="text-[11px] text-[var(--muted-2)] mt-2 leading-relaxed">
-                Auto-detects provider from key prefix. OpenRouter <span className="mono">:free</span> models are <strong>totally free</strong> (no card). Without a key the app uses an in-browser AI (Transformers.js, ~67MB one-time download) and falls back to a local heuristic.
+                Auto-detects provider from key prefix. OpenRouter <span className="mono">:free</span> models are <strong>totally free</strong> (no card). Without a key the app uses the local rules fallback.
               </p>
               <a
                 href="https://openrouter.ai/keys"
